@@ -1,0 +1,4 @@
+dictionary,n_features,n_train_snapshots,condition_number
+D1,7,3360,35.519934758123526
+D2,28,3360,976.8532816416681
+D3,25,3360,9.397898192321414e+16

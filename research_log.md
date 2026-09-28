@@ -258,3 +258,78 @@ renumbering CLAUDE.md without the full Part A list):
   via what the seeds generate, not .entropy; and simulation_day_list()
   starts on a Wednesday, so its first 7 entries span parts of two
   Monday-anchored weeks, not one.)
+
+Sep 28: P5 observables done (src/observables.py, src/trajectory_split.py,
+src/real_state_fill.py, src/build_observables.py). Decisions locked (plan
+numbers per the last correction: SIS=#9, calibration=#10, scenarios=#11,
+splits=#14, seeds=#18 -- content followed, CLAUDE.md still not renumbered):
+
+- "Identity included in the dictionary" clarified: it means the raw state
+  x itself is a feature (so a predicted lifted state can be read back down
+  to x by selection), NOT the constant function -- already true by
+  construction for D1/D2/D3 (verified by test_all_dictionaries_include_
+  the_raw_state_x). The constant 1 is a SEPARATE, newly logged decision:
+  prepended to all three dictionaries, because the simulator's importation
+  epsilon makes the dynamics affine and a K with no offset term can't
+  represent that; D1+constant is also the natural "linear EDMD" ablation
+  baseline for P8. Feature counts for n=6, verified exactly by
+  tests/test_observables.py: D1=7 (1+x), D2=28 (1+x+x^2+15 cross terms),
+  D3=25 (1+x+x^2+Wx+x-elementwise-times-Wx). D3's cross term is confirmed
+  elementwise (n features), not a dot product (which would collapse to a
+  single scalar) -- explicit test.
+- Gap-filling utility (src/real_state_fill.py) built and tested now, per
+  instructions, but NOT applied to the real series in this phase -- K is
+  never fit on real data. fill_state_vector prefers a genuine states_real
+  value (even if low_n-flagged -- still a real estimate) over the P3
+  carry-forward value, and returns NaN only if neither exists; a separate,
+  STRICTER observed_for_scoring_mask (n_tested >= 10) is for P8's accuracy
+  scoring only -- confirmed these two masks disagree exactly on low_n
+  cells (explicit test). Both will be applied to the real series starting
+  in P8.
+- No scaling inside the dictionaries (features have very different natural
+  scales -- x^2 is tiny next to x). P6 will fit and save a StandardScaler
+  on the training split only.
+- W: the row-normalized OVERALL W from P2 (p2_ward_matrix_W_all.csv),
+  confirmed identical row/column group order to config.WARD_GROUPS and to
+  states_sim.npz's own group order (explicit assert in
+  src/build_observables.py, would raise loudly if it ever drifted).
+  LIMITATION (logged per instructions): W is time-invariant, built from
+  the WHOLE contact period, including the weeks later used as P4's
+  held-out weeks. It contains no MRSA outcome information (it's built
+  purely from contact seconds), so this doesn't leak calibration targets,
+  but it does mean D3's network structure isn't blind to the holdout
+  period's contact patterns -- acceptable per instructions, flagged for
+  the report.
+- feature_names saved per dictionary (results/tables/p5_feature_names_D*.csv)
+  for P7/P9 eigenmode interpretation.
+- Train/val/test split defined ONCE here (src/trajectory_split.py):
+  70/15/15 by trajectory, stratified independently within each scenario
+  (endemic/outbreak) so both keep the ratio, fixed seed (config.SEED).
+  Real counts: 105/22/23 per scenario (150 each), verified exactly by
+  test_split_on_real_trajectory_metadata_matches_expected_counts. Saved to
+  data/processed/trajectory_split.csv -- P6 onward must load this file,
+  not re-derive a split.
+- Code confirmed dimension-agnostic: n=5 (patients-only, deferred to E6)
+  produces the expected 21/21-feature D2/D3 dictionaries with no code
+  changes (explicit test).
+- CONDITIONING FINDING, worth flagging prominently for P6: on the training
+  split's stacked source snapshots (3,360 = 105 train trajectories x 16
+  transitions, both scenarios), condition numbers are D1=35.5, D2=976.9,
+  D3=9.4e16 (numerically singular -- 4 exact machine-epsilon-zero singular
+  values, plus 2 more that are much smaller than the rest). Root cause
+  diagnosed, not just observed: Wx = x @ W.T is a LINEAR function of x, so
+  for ANY W, including both x and Wx as separate linear features is
+  structurally rank-deficient (rank([x, Wx]) <= rank(x) = 6, regardless of
+  how much data you have) -- only the nonlinear terms (x^2, x*(Wx)) can
+  contribute genuinely new rank. And because P2 found W strongly diagonal-
+  dominant (~90% within-ward contact), x*(Wx) is itself nearly
+  proportional to x^2 elementwise (empirical corr(x_i, (Wx)_i) ranges
+  0.80-0.9997 across the 6 wards), so even the nonlinear terms are close
+  to collinear. This is a property of the LOCKED D3 definition combined
+  with the real network structure, not a bug -- not deviating from the
+  spec, but this means ridge regularization in P6 is not an optional nice-
+  to-have for D3, it is essential just to get a well-posed solve. Full
+  numbers in results/tables/p5_lifted_matrix_conditioning.csv.
+- 25 new tests (tests/test_observables.py, test_trajectory_split.py,
+  test_real_state_fill.py), all passing alongside the existing 97 (112
+  total).
