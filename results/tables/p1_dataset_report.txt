@@ -1,0 +1,142 @@
+P1 DATA AUDIT REPORT
+============================================================
+
+1. SHAPES
+         file   rows  cols
+admission.csv    795     2
+  mat.day.csv 124924     4
+ microbio.csv   6728    14
+
+2. MISSING VALUES
+         file        column  n_missing
+admission.csv    calc_ident          0
+admission.csv service_pa_pe          0
+       file column  n_missing
+mat.day.csv   from          0
+mat.day.csv     to          0
+mat.day.csv    day          0
+mat.day.csv length          0
+        file         column  n_missing
+microbio.csv     calc_ident          0
+microbio.csv         statut          0
+microbio.csv       date_prl          0
+microbio.csv date_prl_posix          0
+microbio.csv           ndem          0
+microbio.csv           same          0
+microbio.csv             sa          0
+microbio.csv           sasm          0
+microbio.csv           sarm          0
+microbio.csv          germe       4161
+microbio.csv  service_pa_pe          0
+microbio.csv            age        145
+microbio.csv           sexe          0
+microbio.csv         strain          0
+
+3. DUPLICATES
+         file                         check  count
+admission.csv           full-row duplicates      0
+  mat.day.csv           full-row duplicates      0
+  mat.day.csv duplicate (from,to,day) pairs      0
+ microbio.csv           full-row duplicates      0
+mat.day.csv: fraction of rows with a same-day reverse (to,from,day) partner = 0.9988
+
+4. DATE RANGES
+        file   column        min        max
+ mat.day.csv      day 2009-07-01 2009-10-25
+microbio.csv date_prl 2009-05-04 2009-10-27
+
+5. PEOPLE PER FILE
+         file  n_people  n_PA  n_PE
+admission.csv       795   452   343
+  mat.day.csv       589   329   260
+ microbio.csv       795   452   343
+microbio.csv: rows where 'statut' disagrees with calc_ident prefix = 0
+
+6. ID OVERLAP BETWEEN FILES
+                               check  count
+ contact people not in admission.csv      0
+microbio people not in admission.csv      0
+ admission people with zero contacts    206
+
+7. MISSING CONTACT DAYS
+Study window 2009-07-01 to 2009-10-25: 117 calendar days, 110 distinct days present in mat.day.csv, 7 missing.
+Missing days:
+2009-07-21
+2009-07-22
+2009-07-23
+2009-08-28
+2009-08-29
+2009-09-18
+2009-09-19
+
+8. WEEKLY TEST COVERAGE PER WARD GROUP
+Ward group sizes (admission.csv):
+ward_group
+Menard 1    146
+Menard 2    142
+Sorrel 0    147
+Sorrel 1    117
+Sorrel 2    134
+Other       109
+Coverage = distinct people tested that week / ward group size:
+ward_group  Menard 1  Menard 2  Sorrel 0  Sorrel 1  Sorrel 2  Other
+week                                                               
+2009-05-04     0.493     0.000     0.000     0.000     0.000  0.000
+2009-05-11     0.521     0.296     0.000     0.427     0.000  0.000
+2009-05-18     0.418     0.141     0.000     0.342     0.000  0.000
+2009-05-25     0.479     0.352     0.299     0.462     0.000  0.000
+2009-06-01     0.507     0.415     0.327     0.436     0.313  0.000
+2009-06-08     0.479     0.458     0.374     0.419     0.336  0.633
+2009-06-15     0.479     0.437     0.422     0.402     0.381  0.587
+2009-06-22     0.432     0.352     0.449     0.410     0.358  0.624
+2009-06-29     0.466     0.423     0.361     0.419     0.321  0.578
+2009-07-06     0.370     0.437     0.374     0.410     0.351  0.514
+2009-07-13     0.260     0.197     0.000     0.188     0.142  0.000
+2009-07-20     0.459     0.430     0.388     0.453     0.299  0.514
+2009-07-27     0.473     0.394     0.361     0.410     0.328  0.505
+2009-08-03     0.493     0.444     0.422     0.427     0.351  0.532
+2009-08-10     0.479     0.049     0.381     0.419     0.291  0.000
+2009-08-17     0.363     0.387     0.442     0.453     0.306  0.505
+2009-08-24     0.507     0.373     0.238     0.419     0.299  0.514
+2009-08-31     0.493     0.387     0.422     0.265     0.306  0.541
+2009-09-07     0.466     0.458     0.367     0.436     0.351  0.523
+2009-09-14     0.479     0.451     0.395     0.427     0.269  0.523
+2009-09-21     0.445     0.401     0.374     0.342     0.328  0.523
+2009-09-28     0.336     0.387     0.327     0.342     0.269  0.514
+2009-10-05     0.000     0.373     0.327     0.316     0.328  0.349
+2009-10-12     0.000     0.345     0.231     0.000     0.299  0.101
+2009-10-19     0.000     0.000     0.204     0.000     0.291  0.138
+2009-10-26     0.000     0.000     0.000     0.000     0.284  0.000
+
+9. PEOPLE WITH NO CONTACTS
+admission.csv people with zero rows in mat.day.csv: 206
+
+10. CONTACT-LENGTH STATISTICS (seconds)
+ min   max        mean  median          std      n
+  60 86400 3885.919039   390.0 11335.251919 124924
+
+11. date_prl vs date_prl_posix
+Identical for all rows (as dates): True (rows differing: 0)
+
+12. REFERENCE NUMBER CROSS-CHECK (vs CLAUDE.md 'first inspection' numbers)
+                               metric  expected  computed  match
+                   admission.csv rows       795       795   True
+                     admission.csv PA       452       452   True
+                     admission.csv PE       343       343   True
+admission.csv distinct service values         9         9   True
+                     mat.day.csv rows    124924    124924   True
+          mat.day.csv distinct people       589       589   True
+                       mat.day.csv PA       329       329   True
+                       mat.day.csv PE       260       260   True
+               mat.day.csv length min        60        60   True
+               mat.day.csv length max     86400     86400   True
+                    microbio.csv rows      6728      6728   True
+                  microbio.csv people       795       795   True
+                 microbio.csv PA rows      3369      3369   True
+                 microbio.csv PE rows      3359      3359   True
+             microbio.csv sarm=1 rows      1118      1118   True
+             microbio.csv sarm=0 rows      5610      5610   True
+   people MRSA-positive at least once       295       295   True
+    admission people with no contacts       206       206   True
+ ward-group-unmapped admission people         0         0   True
+All reference numbers match: True

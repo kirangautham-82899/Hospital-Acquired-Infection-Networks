@@ -1,0 +1,20 @@
+metric,expected,computed,match
+admission.csv rows,795,795,True
+admission.csv PA,452,452,True
+admission.csv PE,343,343,True
+admission.csv distinct service values,9,9,True
+mat.day.csv rows,124924,124924,True
+mat.day.csv distinct people,589,589,True
+mat.day.csv PA,329,329,True
+mat.day.csv PE,260,260,True
+mat.day.csv length min,60,60,True
+mat.day.csv length max,86400,86400,True
+microbio.csv rows,6728,6728,True
+microbio.csv people,795,795,True
+microbio.csv PA rows,3369,3369,True
+microbio.csv PE rows,3359,3359,True
+microbio.csv sarm=1 rows,1118,1118,True
+microbio.csv sarm=0 rows,5610,5610,True
+people MRSA-positive at least once,295,295,True
+admission people with no contacts,206,206,True
+ward-group-unmapped admission people,0,0,True
