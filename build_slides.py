@@ -288,13 +288,11 @@ def build():
             "Dominant (most persistent) mode's top ward:",
             "D1 says Menard 1 (45.2% share)",
             "D2 and D3 agree: Sorrel 1 (~42% share)",
-            "D3's 6 spurious null-space eigenvalues",
-            "(from the proven rank deficiency) sit",
-            "near the origin, cleanly separated",
-            "from the 19 real modes near |λ|=1",
-            "This disagreement is NOT resolved from",
-            "eigenmodes alone — tested next against",
-            "simulated ground truth",
+            "D3's 6 spurious null-space eigenvalues (from the proven rank "
+            "deficiency) sit near the origin, cleanly separated from the "
+            "19 real modes near |λ|=1",
+            "This disagreement is NOT resolved from eigenmodes alone — "
+            "tested next against simulated ground truth",
         ],
         caption="Figure: D3's eigenvalue spectrum — real modes (blue) vs. spurious null-space modes (red).",
     )
@@ -318,15 +316,10 @@ def build():
         prs, "Simulated Superspreader Ground Truth (P9)",
         f"{FIG}/p9_ground_truth_bar.png",
         bullets=[
-            "Ground truth: cut each ward's",
-            "contacts 50%, measure the drop",
-            "in colonized person-days",
-            "(100 replicates, common random",
+            "Ground truth: cut each ward's contacts 50%, measure the drop "
+            "in colonized person-days (100 replicates, common random "
             "numbers, paired comparison)",
-            "",
-            "Ranking: Menard 1 > Sorrel 1 >",
-            "Menard 2 > Sorrel 2 > Sorrel 0 >",
-            "Other",
+            "Ranking: Menard 1 > Sorrel 1 > Menard 2 > Sorrel 2 > Sorrel 0 > Other",
         ],
         caption="Figure: drop in colonized person-days per ward, error bars = per-replicate std.",
     )
@@ -349,17 +342,11 @@ def build():
         prs, "The Same Pattern, Visually",
         f"{FIG}/p9_rank_heatmap.png",
         bullets=[
-            "ground_truth, degree_centrality,",
-            "and eigenvector_centrality",
+            "ground_truth, degree_centrality, and eigenvector_centrality "
             "columns look nearly identical",
-            "",
-            "The three koopman columns",
-            "look comparatively scrambled",
-            "",
-            "Nuance: koopman_D1 DOES pick",
-            "the #1 ward correctly (Menard 1)",
-            "— but has the worst OVERALL",
-            "rank correlation of the three",
+            "The three koopman columns look comparatively scrambled",
+            "Nuance: koopman_D1 DOES pick the #1 ward correctly (Menard 1) "
+            "— but has the worst OVERALL rank correlation of the three",
         ],
         caption="Figure: ward ranks (1=highest) across all candidates and the ground truth.",
     )
@@ -368,18 +355,11 @@ def build():
         prs, "Intervention Simulation (P10): Targeting Matters",
         f"{FIG}/p10_drop_vs_budget.png",
         bullets=[
-            "Equal-budget framework:",
-            "budget = k × reduction fraction",
-            "",
-            "Every TARGETED strategy beats",
-            "BOTH untargeted strategies",
-            "(random, whole-hospital) at",
-            "every matching budget",
-            "",
-            "At k=2: koopman_D2/D3 slightly",
-            "beats degree-targeting — a higher",
-            "overall correlation doesn't",
-            "guarantee the better k=2 pick",
+            "Equal-budget framework: budget = k × reduction fraction",
+            "Every TARGETED strategy beats BOTH untargeted strategies "
+            "(random, whole-hospital) at every matching budget",
+            "At k=2: koopman_D2/D3 slightly beats degree-targeting — a "
+            "higher overall correlation doesn't guarantee the better k=2 pick",
         ],
         caption="Figure: drop in colonized person-days vs. budget, by strategy.",
     )
@@ -403,14 +383,14 @@ def build():
     add_bullet_slide(
         prs, "Discussion",
         [
-            "The Koopman/EDMD machinery works and was built/verified rigorously",
+            "The Koopman/EDMD machinery works and was built/verified rigorously "
             "(exact recovery on synthetic systems, closed-form agreement, 179 tests)",
-            "On THIS dataset, it does not outperform simpler alternatives — reported",
-            "honestly, with three concrete, verifiable reasons:",
+            "On THIS dataset, it does not outperform simpler alternatives — "
+            "reported honestly, with three concrete, verifiable reasons:",
             ("(a) SIS calibration sits on a weakly-identified ridge (~16 real snapshots)", 1),
             ("(b) D3, the “network-aware” dictionary, is PROVABLY no richer than D2", 1),
             ("(c) raw ward contact volume is a strong, nearly-free predictor", 1),
-            "Targeting still matters enormously, independent of which score is used —",
+            "Targeting still matters enormously, independent of which score is used — "
             "a practically actionable finding that survives every robustness check",
         ],
     )
@@ -429,9 +409,10 @@ def build():
     add_bullet_slide(
         prs, "Conclusion & Future Work",
         [
-            "Built a complete, rigorously-tested pipeline: real network → calibrated",
-            "SIS simulator → EDMD → eigenmodes → validated against simulated ground truth",
-            "Honest answer: network-aware Koopman eigenmodes do not beat simple",
+            "Built a complete, rigorously-tested pipeline: real network → "
+            "calibrated SIS simulator → EDMD → eigenmodes → validated "
+            "against simulated ground truth",
+            "Honest answer: network-aware Koopman eigenmodes do not beat simple "
             "degree centrality for THIS dataset — traced to specific, understood causes",
             "“Some form of targeting beats none” is robust and practically useful",
             "FUTURE WORK:",
@@ -443,14 +424,13 @@ def build():
     add_bullet_slide(
         prs, "References",
         [
-            "Obadia, T., Silhol, R., Opatowski, L., Temime, L., Legrand, J.,",
-            "Thiébaut, A.C.M., et al. (2015). Detailed Contact Data and the",
-            "Dissemination of Staphylococcus aureus in Hospitals.",
+            "Obadia, T., Silhol, R., Opatowski, L., Temime, L., Legrand, J., "
+            "Thiébaut, A.C.M., et al. (2015). Detailed Contact Data and the "
+            "Dissemination of Staphylococcus aureus in Hospitals. "
             "PLOS Computational Biology, 11(3):e1004170.",
-            "",
-            "Duval, A., Obadia, T., Martinet, L., Boëlle, P.Y., Fleury, E.,",
-            "Guillemot, D., et al. (2018). Measuring dynamic social contacts",
-            "in a rehabilitation hospital: effect of wards, patient and staff",
+            "Duval, A., Obadia, T., Martinet, L., Boëlle, P.Y., Fleury, E., "
+            "Guillemot, D., et al. (2018). Measuring dynamic social contacts "
+            "in a rehabilitation hospital: effect of wards, patient and staff "
             "characteristics. Scientific Reports, 8:1686.",
         ],
     )
