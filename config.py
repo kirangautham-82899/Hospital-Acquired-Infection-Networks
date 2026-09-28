@@ -1,6 +1,8 @@
 """Project-wide constants. No magic numbers outside this file."""
 from pathlib import Path
 
+import numpy as np
+
 SEED = 42
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -20,3 +22,23 @@ STUDY_END = "2009-10-25"
 
 WARD_GROUPS = ["Menard 1", "Menard 2", "Sorrel 0", "Sorrel 1", "Sorrel 2", "Other"]
 OTHER_SERVICES = ["Autre", "Garde de nuit", "Kine", "Ergo"]
+
+# --- P4: SIS simulation + calibration ---
+N_WEEKS = 17  # weeks 0-16, Monday-anchored (src/network.py assign_week)
+CALIBRATION_WEEKS = list(range(0, 12))  # weeks 0-11
+HOLDOUT_WEEKS = list(range(12, 17))  # weeks 12-16, sanity check only, never tuned on
+
+# Starting grid (rough estimates per research_log.md, not fit from data;
+# widened automatically if the best point lands on an edge).
+BETA_GRID = list(np.geomspace(1e-3, 5e-2, 8))  # per contact-hour
+GAMMA_GRID = list(np.geomspace(0.005, 0.1, 8))  # per day
+EPSILON_GRID = list(np.geomspace(1e-4, 5e-3, 5))  # per day
+N_CALIBRATION_REPLICATES = 20  # same seeds at every grid point (common random numbers)
+
+N_TRAINING_TRAJECTORIES = 300
+TRAJECTORY_SCENARIOS = ["endemic", "outbreak"]  # split 50/50
+OUTBREAK_SEED_RANGE = (1, 3)  # 1-3 seeded cases in one ward
+TRAJECTORY_PARAM_MULTIPLIER_RANGE = (0.5, 2.0)  # beta, gamma varied around calibrated values
+ENDEMIC_PREVALENCE_MULTIPLIER_RANGE = (0.5, 1.5)  # applied to each group's real prevalence
+
+DEFAULT_SIMULATION_POPULATION = "all"  # "all" (589, 6 groups) or "patients_only" (329, 5 wards; deferred to E6)

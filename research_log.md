@@ -151,3 +151,110 @@ Decisions locked:
   ward, low_n cells marked).
 - 14 new tests in tests/test_states.py, all passing alongside the existing
   51 (65 total).
+
+Sep 28: P4 SIS simulation + calibration done (src/simulate.py,
+src/calibrate_sim.py, src/trajectories.py, src/build_simulation.py).
+Decisions locked (per correction: plan numbers SIS=#9, calibration=#10,
+scenarios=#11, splits=#14, seeds=#18 -- still following content, not
+renumbering CLAUDE.md without the full Part A list):
+
+- Mechanism: daily individual-level SIS on the 589-person contact network
+  (patients-only deferred to experiment E6 -- population is a parameter
+  everywhere in src/simulate.py/calibrate_sim.py/trajectories.py, defaulting
+  to "all"). P(S->I from contacts that day) = 1-exp(-beta*H_i(t)), H_i(t) =
+  that day's contact-hours with currently-infected neighbors (the per-
+  neighbor-independent-trial assumption collapses cleanly to this single
+  exponential in the SUM of hours, verified analytically: a 2-person
+  hand-built network with H=2h, beta=0.05 gave empirical P(infect)=0.0952
+  over 20,000 replicates vs analytic 1-exp(-0.1)=0.0952). Importation
+  epsilon and contact transmission combine as independent events:
+  P(S->I)=1-(1-P_transmit)(1-epsilon). Decolonization P(I->S)=gamma,
+  independent per person per day.
+- Comparing like with like (calibration objective): real prevalence only
+  reflects tested people, so the objective reads each tested person's
+  SIMULATED status on their REAL test date and aggregates with the exact
+  same rule P3 uses (any positive that week = positive, person counted
+  once) -- see src/calibrate_sim.py's simulated_weekly_prevalence. Loss =
+  n_tested(real)-weighted mean squared error, calibration weeks (0-11)
+  only, P3's low_n-flagged group-weeks excluded.
+- Two DIFFERENT initial-condition schemes, as instructed:
+  - Calibration runs: each person's last pre-window status if known
+    (states_pre_window_last_status.csv from P3); people with no pre-window
+    test draw Bernoulli(their group's pre-window prevalence) -- never
+    default susceptible.
+  - Training runs: endemic starts draw an INDEPENDENT Uniform(0.5,1.5)
+    multiplier PER GROUP PER TRAJECTORY (not one shared multiplier per
+    trajectory -- chosen to maximize coverage of the joint 6-ward state
+    space, since a single shared multiplier would only move every ward up
+    or down together) applied to that group's baseline real prevalence
+    (mean of states_real over the calibration weeks, excluding low_n),
+    capped at 1; each person in the group then drawn independently
+    Bernoulli at that probability. Outbreak starts: everyone susceptible
+    except 1-3 seeded cases in ONE randomly chosen ward, seed ward varied
+    per trajectory. Split exactly 150/150 of 300. beta and gamma
+    independently drawn Uniform(0.5x, 2x) of their calibrated values PER
+    TRAJECTORY; epsilon held fixed at its calibrated value (decision
+    content names only beta/gamma as varied). Every trajectory tagged:
+    scenario, seed_ward, n_seeds, beta, gamma, epsilon, ic_seed,
+    param_seed, dyn_seed.
+- Training-data weekly convention (DIFFERENT from the calibration
+  objective, on purpose -- locked so P6 uses the same one): mean daily
+  prevalence over a Monday-anchored week's calendar days, across ALL
+  people in the group (the simulator knows everyone, unlike real testing).
+- Grid: beta 8 log-spaced pts in [1e-3,5e-2]/contact-hour, gamma 8 in
+  [0.005,0.1]/day, epsilon 5 in [1e-4,5e-3]/day (320 points), 20 replicates
+  per point with COMMON RANDOM NUMBERS (same (ic_seed,dyn_seed) pairs, from
+  SeedSequence.spawn, reused at every grid point) -- a grid point's
+  simulated prevalence is the mean, per (week,group) cell, of that cell's
+  prevalence across the 20 replicates. Full run took ~2.7 min (320*20=6400
+  simulated 117-day trajectories).
+- Split: calibrated on weeks 0-11, held out weeks 12-16 (simulator still
+  runs all 117 days regardless). Held-out loss (sanity check only, never
+  used to pick the point): 0.00919 vs calibration loss 0.00516 -- same
+  order of magnitude, no sign of gross overfitting to the calibration
+  window.
+- RESULT / LIMITATION TO REPORT: the best point (beta=6.82e-4/hr,
+  gamma=1.67e-3/day, epsilon=7.07e-4/day) was on the low edge of BOTH beta
+  and gamma initially. Auto-widened once (3x extension in the hugged
+  direction, same point density) per instructions -- beta resolved off the
+  edge, but gamma is STILL at the low edge of the widened grid. This
+  reflects a genuine ridge/identifiability issue, not a bug: with gamma
+  this low (mean carriage ~600 days, implausible for MRSA biologically),
+  the simulated ward trajectories stay nearly flat near their initial
+  condition for the whole 17-week window (visually confirmed in
+  p4_calibration_fit.png) -- and because the real weekly series is noisy
+  with no strong trend, a near-static model is hard for weighted MSE to
+  beat. 16 of 320 grid points are within 10% of the best loss, confirming
+  the expected ridge (beta/gamma partly trade off). Full grid saved to
+  p4_calibration_grid.csv; not chasing the edge further by construction --
+  flagging this as an open modeling question for the user (e.g. whether to
+  add a biologically-motivated prior/bound on gamma, or accept that with
+  only ~12 noisy weekly snapshots per ward, beta/gamma are only weakly
+  identified from this objective alone).
+- Files: data/processed/states_sim.npz (states: [300,17,6] float array in
+  config.WARD_GROUPS order, no NaNs, values in [0, 0.65], plus per-
+  trajectory metadata arrays); results/tables/p4_calibration_grid.csv,
+  p4_calibrated_params.csv, p4_trajectories_metadata.csv;
+  results/figures/p4_calibration_fit.png (real calib/holdout vs simulated,
+  per ward).
+- Verification beyond the plan's two checks, all implemented as pytest
+  (tests/test_simulate.py): beta=epsilon=0 -> colonized count provably
+  non-increasing (deterministic given the mechanism, not just usually
+  true) and decays to 0 within 117 days; gamma=epsilon=0 -> non-decreasing;
+  S+I=N by construction (bool array, checked explicitly); same seed ->
+  bit-identical history; a zero-contact-days scenario shows no transmission
+  to an isolated person while decolonization still applies; a 2-person
+  hand-built network's empirical infection probability over 20,000
+  replicates matched the analytic 1-exp(-beta*H) within 5 standard errors.
+- 32 new tests across tests/test_simulate.py, test_calibrate_sim.py,
+  test_trajectories.py (all passing alongside the existing 65, 97 total).
+  Two real bugs were caught by writing these tests (not left unfixed):
+  calibration_loss relied on pandas' merge-suffix behavior to name the
+  weight column, which broke if sim_prevalence lacked its own n_tested
+  column -- fixed to rename explicitly before merging, weight always taken
+  from states_real. (The other two initial test failures were bugs in the
+  TESTS' own assumptions, not the source: SeedSequence.spawn() children
+  share the same .entropy as their root, so distinctness has to be checked
+  via what the seeds generate, not .entropy; and simulation_day_list()
+  starts on a Wednesday, so its first 7 entries span parts of two
+  Monday-anchored weeks, not one.)
