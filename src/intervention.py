@@ -1,15 +1,24 @@
-"""P9: the superspreader ward ground-truth experiment (decision content
--- see research_log.md for the Part A numbering caveat). Ground truth is
-MEASURED IN SIMULATION: for each ward, cut ALL of that ward's contacts
-(any edge touching a person who belongs to that ward, both within-ward
-and between-ward -- see scale_ward_edges below for why "all", not just
-within-ward) by 50% for the entire 117-day simulated period, and record
-the drop in colonized person-days relative to a no-intervention baseline.
-Uses the SAME calibrated (beta, gamma, epsilon) and calibration initial
-condition as P4/P6 (never re-calibrated here), with COMMON RANDOM NUMBERS
-(the same replicate seed pairs for baseline and every intervention) for a
-paired, variance-reduced comparison -- same technique as P4's grid search
-and P6's lambda selection.
+"""P9/P10: ward contact-reduction interventions, simulated (decision
+content -- see research_log.md for the Part A numbering caveat).
+
+P9's superspreader_experiment: for each ward, cut ALL of that ward's
+contacts (any edge touching a person who belongs to that ward, both
+within-ward and between-ward -- see scale_ward_edges below for why
+"all", not just within-ward) by 50% for the entire 117-day simulated
+period, and record the drop in colonized person-days relative to a
+no-intervention baseline.
+
+P10's multi-ward experiments (scale_multiple_ward_edges, used by
+src/build_p10.py) generalize this to cutting a SET of k wards
+simultaneously by a chosen reduction fraction, for comparing intervention
+STRATEGIES (random / whole-hospital / degree-targeted / Koopman-targeted)
+under an equal-budget framework.
+
+Both use the SAME calibrated (beta, gamma, epsilon) and calibration
+initial condition as P4/P6 (never re-calibrated here), with COMMON RANDOM
+NUMBERS (the same replicate seed pairs for baseline and every
+intervention) for a paired, variance-reduced comparison -- same technique
+as P4's grid search and P6's lambda selection.
 
 "Cut a ward's contacts" is interpreted as scaling EVERY edge touching
 that ward (either endpoint), not just within-ward edges: a real
@@ -30,10 +39,22 @@ def scale_ward_edges(edges, admission, ward, scale=0.5):
     """Return a copy of `edges` (columns day, u, v, seconds) with the
     seconds of any row touching a person in `ward` (u's ward == ward OR
     v's ward == ward) multiplied by `scale`. A within-ward edge (both
-    endpoints in `ward`) is still scaled exactly once, not twice."""
+    endpoints in `ward`) is still scaled exactly once, not twice. A
+    single-ward special case of scale_multiple_ward_edges."""
+    return scale_multiple_ward_edges(edges, admission, [ward], scale)
+
+
+def scale_multiple_ward_edges(edges, admission, wards, scale):
+    """Generalizes scale_ward_edges to a SET of wards: any row touching a
+    person in ANY of `wards` is scaled by `scale`, exactly once even if
+    it touches two targeted wards (or two people in the same targeted
+    ward). Passing all 6 wards implements a uniform whole-hospital
+    reduction (every edge touches some targeted ward, so every edge is
+    scaled)."""
     ward_of = person_ward_map(admission)
+    wards = set(wards)
     out = edges.copy()
-    touches = out["u"].map(ward_of).eq(ward) | out["v"].map(ward_of).eq(ward)
+    touches = out["u"].map(ward_of).isin(wards) | out["v"].map(ward_of).isin(wards)
     out.loc[touches, "seconds"] = out.loc[touches, "seconds"] * scale
     return out
 
@@ -43,6 +64,47 @@ def colonized_person_days(history):
     indicator -- the total burden measure the intervention is scored
     against."""
     return float(history.sum())
+
+
+def ward_choice_rngs(n_replicates, base_seed):
+    """n_replicates independent RNGs for ward-selection randomness
+    (P10's 'random' strategy), deterministically derived from base_seed
+    but from a SEPARATE SeedSequence root than any ic_seed/dyn_seed
+    stream (see replicate_seed_pairs), so ward choice never disturbs the
+    common-random-numbers pairing those carry across every strategy."""
+    seeds = np.random.SeedSequence(base_seed).spawn(n_replicates)
+    return [np.random.default_rng(s) for s in seeds]
+
+
+def run_person_days_random_wards(people, index, day_list, edges, admission, groups, k, scale,
+                                  beta, gamma, epsilon, pre_window_last_status, seed_pairs,
+                                  ward_seed_base):
+    """Like run_person_days_replicates, but for the 'random' intervention
+    strategy: each replicate independently draws a random k-ward subset
+    (from ward_choice_rngs, kept separate from ic_seed/dyn_seed), scales
+    those wards' edges by `scale`, and simulates. Averages over BOTH
+    ward-choice randomness and simulation stochasticity -- the expected
+    outcome of 'pick k wards uniformly at random', not one fixed pick.
+    Only builds edge arrays once per DISTINCT ward subset actually drawn
+    (at most C(len(groups), k) of them, not once per replicate) --
+    C(6,1)=6 or C(6,2)=15 in this project, far fewer than 200 replicates.
+    Returns (totals array, list of the k-ward list chosen per
+    replicate)."""
+    ward_rngs = ward_choice_rngs(len(seed_pairs), ward_seed_base)
+
+    totals = np.empty(len(seed_pairs))
+    chosen_per_replicate = []
+    edge_arrays_cache = {}
+    for i, ((ic_seed, dyn_seed), ward_rng) in enumerate(zip(seed_pairs, ward_rngs)):
+        chosen = tuple(sorted(ward_rng.choice(groups, size=k, replace=False).tolist()))
+        chosen_per_replicate.append(list(chosen))
+        if chosen not in edge_arrays_cache:
+            scaled_edges = scale_multiple_ward_edges(edges, admission, list(chosen), scale=scale)
+            edge_arrays_cache[chosen] = daily_edge_arrays(scaled_edges, index)
+        initial = calibration_initial_state(people, index, pre_window_last_status, admission, seed=ic_seed)
+        history = simulate_sis(initial, day_list, edge_arrays_cache[chosen], beta, gamma, epsilon, seed=dyn_seed)
+        totals[i] = colonized_person_days(history)
+    return totals, chosen_per_replicate
 
 
 def run_person_days_replicates(people, index, day_list, edge_arrays_by_day, beta, gamma, epsilon,

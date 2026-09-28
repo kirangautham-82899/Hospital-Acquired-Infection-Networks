@@ -1,7 +1,9 @@
-"""P9: ward-level 'risk score' candidates compared against the simulated
-superspreader ground truth (src/intervention.py) -- the Koopman/eigenmode
-score from P7, and simple network-centrality baselines computed on the
-ward-level contact graph (P2's raw ward contact matrix W).
+"""P9/P10: ward-level 'risk score' candidates compared against the
+simulated superspreader ground truth (src/intervention.py) -- the
+Koopman/eigenmode score from P7, and simple network-centrality baselines
+computed on the ward-level contact graph (P2's raw ward contact matrix
+W). P10 also uses top_k_wards to pick WHICH wards a targeted intervention
+strategy (degree-targeted, Koopman-targeted) acts on.
 
 CAUTION carried through every comparison downstream: there are only 6
 wards. CLAUDE.md's own known limitations already flag this ("Only 6
@@ -60,3 +62,11 @@ def ward_betweenness_centrality(W_raw, groups):
         d["distance"] = 1.0 / d["weight"] if d["weight"] > 0 else np.inf
     centrality = nx.betweenness_centrality(g, weight="distance")
     return pd.Series(centrality).reindex(groups)
+
+
+def top_k_wards(score, k):
+    """The k ward names with the highest score (a pandas Series indexed
+    by ward name, e.g. from ward_degree_centrality or
+    load_koopman_risk_scores). Ties broken by score's own index order
+    (pandas' stable sort)."""
+    return list(score.sort_values(ascending=False).index[:k])

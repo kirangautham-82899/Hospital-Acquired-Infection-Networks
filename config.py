@@ -47,3 +47,11 @@ DEFAULT_SIMULATION_POPULATION = "all"  # "all" (589, 6 groups) or "patients_only
 EDMD_LAMBDA_GRID = list(np.geomspace(1e-6, 1e3, 20))
 EDMD_MAX_HORIZON = 4  # lambda selected on mean RMSE over h=1..4, not just h=1
 EDMD_DICTIONARIES = ["D1", "D2", "D3"]
+
+# --- P10: intervention simulation ---
+INTERVENTION_K_VALUES = [1, 2]  # number of targeted wards
+INTERVENTION_REDUCTIONS = [0.25, 0.50, 0.75]  # per-targeted-ward contact reduction
+INTERVENTION_N_REPLICATES = 200  # common random numbers across every strategy/config
+INTERVENTION_TARGETED_STRATEGIES = ["random", "degree_targeted"] + [
+    f"koopman_targeted_{d}" for d in EDMD_DICTIONARIES
+]

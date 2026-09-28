@@ -754,3 +754,100 @@ three koopman columns look comparatively scrambled).
 corrected bridge-topology experiment-correctness test and hand-checkable
 centrality tests (star graph for eigenvector, path graph for
 betweenness). 167 tests total, all passing.
+
+Sep 28: P10 intervention simulation done (extended src/intervention.py
+and src/risk.py, new src/build_p10.py). Compares intervention STRATEGIES
+(decision content -- Part A numbering still not reconciled) under an
+equal-budget framework: none, random, whole-hospital, degree-targeted,
+and Koopman-targeted (reported as three separate strategies, one per
+dictionary D1/D2/D3, since P9 already found they disagree on which ward
+matters most -- picking just one would have hidden that disagreement
+instead of following it through).
+
+Design choices:
+- Equal budget defined as budget(k, R) = k * R (k targeted wards, each
+  reduced by fraction R). The locked grid (k in {1,2}, R in
+  {25,50,75%}) has a nice emergent property: some cells share a budget
+  across different k (e.g. k=1,R=50% and k=2,R=25% both give budget=0.5),
+  giving free apples-to-apples "more wards, less each" vs "fewer wards,
+  more each" comparisons within the SAME targeted strategy, in addition
+  to the cross-strategy comparisons this phase is mainly about.
+  Whole-hospital, to be compared fairly at a given budget, applies
+  budget/6 to ALL 6 wards -- computed once per distinct budget (5 of
+  them across the 6-cell grid) and reused, not recomputed per (k,R) cell.
+- "Random" strategy: each of the 200 replicates draws an INDEPENDENTLY
+  random k-ward subset (from a seed stream kept deliberately separate
+  from the ic_seed/dyn_seed pairs used everywhere else, so ward-choice
+  randomness never disturbs the common-random-numbers pairing that
+  every OTHER strategy relies on for a valid paired comparison) -- this
+  reports the true expected outcome of "pick k wards uniformly at
+  random," not the outcome of one arbitrary fixed random pick repeated
+  200 times. Optimized to build edge arrays once per DISTINCT ward
+  subset actually drawn (at most C(6,1)=6 or C(6,2)=15), not once per
+  replicate.
+- 200 replicates x common random numbers across every strategy and every
+  (k,R) cell (~36 configurations x 200 = 7,200 simulated 117-day runs),
+  same technique as P4/P6/P9.
+
+TEST-TIME BUG CATCH, a variable-name collision, not a math error:
+src/risk.py's `_symmetrized_graph` (from P9) built the networkx graph
+into a variable named `g`, then relabeled nodes with
+`{i: g for i, g in enumerate(groups)}` -- the dict comprehension's own
+loop variable `g` shadowed the graph object `g` before it was used,
+which would have passed the WRONG value (the last group name) to
+`nx.relabel_nodes`. Caught by code review before it was ever exercised by
+a passing test (renamed to `graph`/`name` immediately) -- flagged here
+because a shadowing bug like this can silently produce a plausible-
+looking but wrong graph rather than crashing, exactly the kind of thing
+this project's verification discipline exists to catch even when a test
+doesn't happen to trip over it first.
+
+MAIN RESULT: every TARGETED strategy (degree_targeted, all three
+koopman_targeted variants) clearly and consistently beats both
+UNTARGETED strategies (random, whole_hospital) at every matching budget
+-- visually unambiguous in p10_drop_vs_budget.png, where the four
+targeted lines sit well above the two untargeted ones (which track each
+other closely) across the whole budget range. This is a clean, positive
+finding: SOME form of targeting is worth a lot more than spreading effort
+thin or picking blindly, regardless of which score is used to target.
+
+Which targeting score wins is more nuanced, and reported in full rather
+than simplified:
+- At k=1 (single ward), degree_targeted and koopman_targeted_D1 are
+  IDENTICAL (both pick Menard 1, P9's #1 ground-truth ward, and post
+  identical drops at every R) -- matches P9's finding that D1's dominant
+  mode is Menard-1-dominated. koopman_D2/D3 (picking Sorrel 1, P9's #2
+  ward) trail noticeably behind at k=1 (e.g. R=75%: drop 162.6 vs 264.1).
+- At k=2, the ranking FLIPS: koopman_targeted_D2/D3 (picking {Sorrel 1,
+  Menard 1} -- P9's true #2 and #1 ground-truth wards together) slightly
+  but consistently OUTPERFORMS degree_targeted (picking {Menard 1,
+  Menard 2} -- degree centrality's own #1 and #2, but ground truth's #1
+  and #3) at every R (e.g. R=75%: drop 412.6 vs 398.3). Reading this
+  together with P9's Spearman results (degree_centrality rho=0.943 vs
+  koopman_D2/D3 rho=0.543/0.429): a HIGHER overall rank correlation does
+  not automatically mean better performance on every specific targeting
+  decision. Degree centrality's error was ranking Menard 2 above Sorrel 1
+  (swapping ground truth's #2 and #3) -- a small rank error overall, but
+  one that directly determined the wrong SECOND ward for a k=2
+  intervention. koopman_D1's own k=2 pick ({Menard 1, Sorrel 2}) is
+  clearly the weakest of the three targeted options at k=2, consistent
+  with D1 having the worst overall Spearman rho (0.257) of the three
+  Koopman variants in P9.
+- koopman_targeted_D2 and koopman_targeted_D3 are graphically IDENTICAL
+  throughout (same top-k ward picks at every k, same resulting drops) --
+  visible in p10_drop_vs_budget.png as one line hiding the other.
+- whole_hospital is consistently (very slightly) better than random at
+  matching budgets, but both are clearly and substantially dominated by
+  every targeted strategy -- neither is ever the best choice at any
+  budget level (results/tables/p10_best_strategy_per_budget.csv).
+
+Files: results/tables/p10_intervention_results.csv (every strategy x k x
+R row: targeted wards, mean person-days, drop mean/std, drop fraction),
+p10_best_strategy_per_budget.csv; results/figures/p10_drop_vs_budget.png.
+
+9 new tests (extending tests/test_intervention.py and tests/test_risk.py):
+multi-ward edge scaling (including the "touches two targeted wards ->
+scaled once, not twice" case), the single-ward function confirmed as a
+special case of the new general one, the random-wards runner's
+reproducibility and ward-choice variation, and top_k_wards. 172 tests
+total, all passing.

@@ -8,6 +8,7 @@ import pytest
 import config
 from src.risk import (
     load_koopman_risk_scores,
+    top_k_wards,
     ward_betweenness_centrality,
     ward_degree_centrality,
     ward_eigenvector_centrality,
@@ -55,3 +56,10 @@ def test_load_koopman_risk_scores_matches_real_p7_output():
         expected = real[real["dictionary"] == dict_name].set_index("ward")["share"]
         for g in config.WARD_GROUPS:
             assert abs(scores[g] - expected[g]) < 1e-12
+
+
+def test_top_k_wards_picks_highest_scores():
+    score = pd.Series([0.5, 0.1, 0.3, 0.9], index=["A", "B", "C", "D"])
+    assert top_k_wards(score, 1) == ["D"]
+    assert top_k_wards(score, 2) == ["D", "A"]
+    assert top_k_wards(score, 4) == ["D", "A", "C", "B"]

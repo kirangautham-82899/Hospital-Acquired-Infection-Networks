@@ -6,7 +6,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.intervention import colonized_person_days, scale_ward_edges, superspreader_experiment
+from src.intervention import (
+    colonized_person_days,
+    scale_multiple_ward_edges,
+    scale_ward_edges,
+    superspreader_experiment,
+)
 from src.simulate import build_person_index, simulation_day_list
 
 
@@ -29,6 +34,46 @@ def test_scale_ward_edges_scales_only_touching_rows():
 def test_colonized_person_days_is_a_plain_sum():
     history = np.array([[True, False, True], [False, False, True]])
     assert colonized_person_days(history) == 3.0
+
+
+def test_scale_multiple_ward_edges_scales_once_even_if_both_wards_targeted():
+    admission = pd.DataFrame(
+        {
+            "calc_ident": ["P1", "P2", "P3", "P4"],
+            "service_pa_pe": ["Menard 1", "Menard 1", "Sorrel 0", "Other"],
+        }
+    )
+    edges = pd.DataFrame(
+        {
+            "day": pd.to_datetime(["2009-07-01"] * 4),
+            "u": ["P1", "P1", "P2", "P4"], "v": ["P2", "P3", "P3", "P4"],
+            "seconds": [100.0, 100.0, 100.0, 100.0],
+        }
+    )
+    out = scale_multiple_ward_edges(edges, admission, ["Menard 1", "Sorrel 0"], scale=0.5)
+    assert out.iloc[0]["seconds"] == 50.0  # P1-P2: both targeted -> scaled once, not twice
+    assert out.iloc[1]["seconds"] == 50.0  # P1-P3: P1 targeted -> scaled
+    assert out.iloc[2]["seconds"] == 50.0  # P2-P3: both targeted -> scaled
+    assert out.iloc[3]["seconds"] == 100.0  # P4-P4: neither ward targeted -> untouched
+
+
+def test_scale_multiple_ward_edges_with_all_wards_matches_uniform_scale():
+    admission = pd.DataFrame({"calc_ident": ["P1", "P2"], "service_pa_pe": ["Menard 1", "Sorrel 0"]})
+    edges = pd.DataFrame(
+        {"day": pd.to_datetime(["2009-07-01"]), "u": ["P1"], "v": ["P2"], "seconds": [200.0]}
+    )
+    out = scale_multiple_ward_edges(edges, admission, ["Menard 1", "Sorrel 0"], scale=0.25)
+    assert out.iloc[0]["seconds"] == 50.0  # every edge touches a targeted ward -> uniformly scaled
+
+
+def test_scale_ward_edges_is_the_single_ward_special_case():
+    admission = pd.DataFrame({"calc_ident": ["P1", "P2"], "service_pa_pe": ["Menard 1", "Sorrel 0"]})
+    edges = pd.DataFrame(
+        {"day": pd.to_datetime(["2009-07-01"]), "u": ["P1"], "v": ["P2"], "seconds": [200.0]}
+    )
+    single = scale_ward_edges(edges, admission, "Menard 1", scale=0.4)
+    multi = scale_multiple_ward_edges(edges, admission, ["Menard 1"], scale=0.4)
+    pd.testing.assert_frame_equal(single, multi)
 
 
 def _bridge_topology():
@@ -109,3 +154,39 @@ def test_superspreader_experiment_reproducible_with_same_seed():
         pre_window_last_status, groups, n_replicates=10, base_seed=3,
     )
     pd.testing.assert_frame_equal(s1, s2)
+
+
+def test_run_person_days_random_wards_varies_choice_and_reproducible():
+    from src.calibrate_sim import replicate_seed_pairs
+    from src.intervention import run_person_days_random_wards
+
+    admission, edges, day_list, people_list = _bridge_topology()
+    people, index = build_person_index(people_list)
+    pre_window_last_status = pd.DataFrame({"calc_ident": [], "last_status": []})
+    groups = ["Menard 1", "Menard 2", "Sorrel 0"]
+
+    seed_pairs = replicate_seed_pairs(20, base_seed=1)
+    totals1, chosen1 = run_person_days_random_wards(
+        people, index, day_list, edges, admission, groups, k=1, scale=0.5,
+        beta=0.02, gamma=0.02, epsilon=0.0005, pre_window_last_status=pre_window_last_status,
+        seed_pairs=seed_pairs, ward_seed_base=42,
+    )
+    assert len(set(tuple(c) for c in chosen1)) > 1  # not always the same ward across replicates
+    assert all(len(c) == 1 and c[0] in groups for c in chosen1)
+
+    totals2, chosen2 = run_person_days_random_wards(
+        people, index, day_list, edges, admission, groups, k=1, scale=0.5,
+        beta=0.02, gamma=0.02, epsilon=0.0005, pre_window_last_status=pre_window_last_status,
+        seed_pairs=seed_pairs, ward_seed_base=42,
+    )
+    assert chosen1 == chosen2  # reproducible ward choice with same ward_seed_base
+    assert np.array_equal(totals1, totals2)
+
+    # a different ward_seed_base should (almost certainly) change the ward choices,
+    # while leaving the simulation's own randomness (seed_pairs) untouched
+    _, chosen3 = run_person_days_random_wards(
+        people, index, day_list, edges, admission, groups, k=1, scale=0.5,
+        beta=0.02, gamma=0.02, epsilon=0.0005, pre_window_last_status=pre_window_last_status,
+        seed_pairs=seed_pairs, ward_seed_base=99,
+    )
+    assert chosen1 != chosen3
