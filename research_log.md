@@ -540,3 +540,120 @@ chart for the dominant mode).
 
 12 new tests (tests/test_eigen.py) -- including the two that caught the
 bugs above -- all passing alongside the existing 128 (140 total).
+
+Sep 28: P8 forecasting, validation, baselines done (src/baselines.py,
+src/forecast.py, src/metrics.py, src/build_p8.py). CLAUDE.md doesn't lock
+specific decisions for this phase beyond the phase name and the decision
+#13-content baseline list (persistence, historical mean, network-exposure
+linear model, ward-level SIS model, linear EDMD ablation), so several
+judgment calls were made (asked to proceed on my own judgment) and are
+logged here.
+
+Design choices:
+- This is the FIRST time K (fit purely on simulated data, P6) is applied
+  to real data anywhere in this project -- deliberately deferred until
+  now. Real starting states are built via P5's real_state_fill (real
+  value preferred, carry-forward fallback up to 2 weeks, never defaults
+  to susceptible); forecasts are scored ONLY against genuinely-observed
+  cells (P5's observed_for_scoring_mask, n_tested >= 10) -- carry-forward
+  values are valid inputs, never valid targets.
+- Forecast protocol: rolling-origin within the single real 17-week
+  series (every usable starting week, horizons 1-4, same convention as
+  P6), not a single fixed origin -- needed for enough data points given
+  how sparse real data is. Every forecast is tagged by which PERIOD its
+  LANDING week falls in: 'calibration' (weeks 0-11) or 'holdout' (weeks
+  12-16, config.HOLDOUT_WEEKS, already defined in P4/P6). K itself is
+  out-of-sample for real data in BOTH periods (never fit on real data at
+  all); the two new baselines below ARE fit on the calibration period, so
+  'holdout' is the one period that is a fair, never-touched test for
+  every model alike -- matches decision #13's real-data time split intent
+  applied to the pieces of this pipeline that DO get fit on real data.
+- Network-exposure linear model (new): x_{t+1,i} ~= a + b*x_{t,i} +
+  c*(Wx_t)_i, ONE shared 3-parameter model pooled across all (week, ward)
+  pairs rather than a separate model per ward -- real data has only ~11
+  usable consecutive-week pairs across the calibration weeks, nowhere
+  near enough to fit 6 separate per-ward models. Fit via the SAME
+  ridge_fit solver as P6/P7 (unpenalized constant, lstsq-based) with a
+  fixed lambda=1.0, not grid-searched -- a full lambda search on ~62
+  training rows would be fitting noise, which is exactly why the Koopman
+  operator itself is never fit on real data at all (P4-P6).
+- Ward-level SIS model (new): mean-field/compartmental SIS directly on
+  the 6-dim weekly prevalence vector (distinct from P4's individual-level
+  daily simulator): x_{t+1,i}-x_{t,i} = beta*(1-x_{t,i})*(Wx_t)_i -
+  gamma*x_{t,i}. Linear in (beta, gamma) given x, so fit by plain least
+  squares (2 parameters, ~62 training rows -- comfortably determined, no
+  regularization needed). Verified exact parameter recovery on noiseless
+  synthetic data before trusting it on real data.
+- Both new baselines' fitting pairs are restricted to the calibration
+  weeks, with the regression TARGET further restricted to genuinely-
+  observed cells (n_tested>=10) -- fitting against a carry-forward-
+  derived pseudo-target would be circular (carry-forward just repeats old
+  information, it isn't new signal about dynamics).
+- Linear EDMD ablation = D1 itself, reused as-is (fit on simulated
+  trajectories in P6, not refit here) -- decision #13 literally names
+  this as one of the baselines to compare the richer dictionaries
+  against, so D1 plays double duty: a primary EDMD result AND one of the
+  5 named baselines.
+- Historical mean baseline: per-ward mean of REAL observed (not filled)
+  prevalence over the calibration weeks only.
+
+BUG CAUGHT BY TESTING, a wiring/argument-order mistake, not a math error:
+forecast_baseline_iteratively (src/build_p8.py) called
+predict_fn(*predict_args, current) where predict_args=(coef, W), which
+put the STATIC W matrix into predict_network_exposure's `x` parameter
+slot and the per-step STATE VECTOR into its `W` slot -- silently
+computing nonsense (a full 6-element array landed in a single-ward 'pred'
+cell) rather than raising an error immediately. First noticed as a
+np.clip crash three steps downstream in src/metrics.py (a symptom, not
+the cause) -- traced back to the actual call site rather than patched at
+the crash site. Fixed by making forecast_baseline_iteratively take
+coef_args and W as explicit, separately-named parameters instead of
+splatting a mixed tuple positionally. Added
+tests/test_build_p8.py specifically exercising this wiring end to end
+(not just the underlying predict_* functions in isolation, which had
+already passed their own unit tests and gave no signal that the caller
+was misusing them) -- this is the kind of bug that passes every unit test
+on the pieces individually and only shows up when they're wired together,
+so the wiring itself needed its own test.
+
+RESULT, reported honestly, an "honest, possibly weak" outcome very much
+in the spirit CLAUDE.md anticipated for the simulated-trajectory
+comparisons: on the HOLDOUT period (weeks 12-16, the one fair test for
+every model), D1/D2/D3 are statistically indistinguishable from
+persistence at h=1 (RMSE 0.0465-0.0466 vs persistence's 0.0464, skill
+scores -0.001 to -0.006 -- i.e. essentially a wash, consistent with P6's
+finding that D1/D2/D3 barely differ from each other). At h=3-4,
+historical_mean becomes the best performer by a clear margin (skill
+~0.20 vs persistence, RMSE flat at 0.0692 regardless of horizon since it
+always predicts the same fixed vector) -- a real, well-known and
+defensible forecasting phenomenon: naive/climatology-average methods
+often beat both persistence and fitted dynamics at longer horizons for
+noisy, mean-reverting series, because the further out you forecast the
+closer the true system tends to sit to its long-run average anyway.
+network_exposure is the weakest model at nearly every horizon in both
+periods (visually confirmed in p8_rmse_by_horizon.png). Plausible
+explanation for EDMD's lack of edge over persistence on real data, not
+confirmed: K was fit PURELY on simulated trajectories, and P4 already
+found the simulator's calibrated dynamics sit on a weak/ambiguous ridge
+(near-static, only weakly identified by the noisy ~16-week real series
+that calibrated it in the first place) -- it is plausible this
+simulation-trained K simply doesn't carry a strong edge onto the real,
+sparse, noisy 16-week series it was never fit on. This is exactly the
+kind of sim-to-real transfer gap the project's known limitations section
+already flags ("about 16 real weekly snapshots only"), now made concrete
+with numbers rather than left as a caveat.
+
+Files: results/tables/p8_baseline_params.csv (fitted network-exposure/
+ward-SIS coefficients), p8_forecast_records_long.csv (every scored
+(model, start, landing, h, ward) row), p8_metrics.csv (full model x
+period x h x ward table, raw+clipped, skill vs persistence),
+p8_metrics_summary.csv (holdout period, overall-ward quick-read view);
+results/figures/p8_rmse_by_horizon.png (calibration vs holdout, all
+models), p8_predicted_vs_actual_holdout.png (h=1, all models).
+
+19 new tests (tests/test_baselines.py, test_forecast.py, test_metrics.py,
+test_build_p8.py) -- including exact-recovery checks for both new
+baselines on noiseless synthetic data, an end-to-end integration check
+applying the real fitted D1 model to real P3 data, and the two wiring
+tests that caught the argument-order bug above. 159 tests total, all
+passing.

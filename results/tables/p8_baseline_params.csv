@@ -1,0 +1,6 @@
+model,param,value
+network_exposure,a,0.11920998743145958
+network_exposure,b,0.2407447317785792
+network_exposure,c,0.14910289608469007
+ward_sis,beta,0.6738566238099507
+ward_sis,gamma,0.5419976334416368
