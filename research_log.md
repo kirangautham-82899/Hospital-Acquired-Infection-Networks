@@ -1003,3 +1003,69 @@ worked from the code alone.
 
 Final state: 179 tests passing, README.md + REPORT.md + P30_slides.pptx +
 run_all.py added, all cleanup fixes applied, requirements.txt current.
+
+## Post-P12: end-to-end pipeline verification (run_all.py)
+
+Ran `run_all.py` fresh (P1-P11 in order) to confirm the whole pipeline
+reproduces from data/raw/ with no hand steps. Console output matched
+every previously-recorded number exactly: P1's 795/124,924/6,728 row
+counts, P2's 62,534/19,974/589 edge/pair/node counts, P4's calibrated
+beta=0.00068194/gamma=0.0016667, P6's D1/D2/D3 lambdas and effective
+ranks (7/28/19), P7's dominant-mode ward shares, P8's holdout RMSE
+table, P9's ground-truth ranking and Spearman table, P10's k=2 drop
+values, and P11's E1-E8 summary. 179/179 tests still pass.
+
+`git status` after the run showed 5 tracked files with byte-level diffs
+despite this: p2_node_metrics_all.csv, p2_node_metrics_patients_only.csv,
+p9_ward_scores.csv, and the two p2_network_by_ward_*.png figures.
+Investigated rather than assumed benign, per the project's verification
+discipline. Sorted both the old (git HEAD) and new versions of
+p2_node_metrics_all.csv by person ID and diffed row-by-row: every row's
+`degree`, `strength`, `degree_centrality`, and `betweenness_centrality`
+values were bit-identical; only `eigenvector_centrality` differed, and
+only in the last 1-2 of ~16 significant digits (e.g.
+0.0010832557461264995 vs ...4987 -- a relative difference of about
+1e-15, i.e. one machine-epsilon ULP). Same pattern in p9_ward_scores.csv:
+only its eigenvector_centrality column moved, at the same magnitude.
+Confirmed the two changed PNGs are p2's ward-colored network layout
+plots (nx.spring_layout on the 589-node graph), not anything that reads
+eigenvector_centrality for size/color (network_plots.py uses a fixed
+node_size and ward-based color, confirmed by reading the source) -- so
+this is the same family of cause acting on a different iterative
+numerical routine, not a second bug.
+
+Root cause: both `nx.eigenvector_centrality_numpy` (src/network.py,
+src/risk.py) and `nx.spring_layout`'s large-graph code path call into
+NumPy/SciPy linear-algebra routines backed by OpenBLAS
+(`numpy.show_config()` confirms scipy-openblas, DYNAMIC_ARCH,
+MAX_THREADS=24). Multi-threaded BLAS reduction order is not guaranteed
+identical run to run -- floating-point addition is not associative, so
+summing the same numbers in a different order (driven by thread
+scheduling, not by config.SEED, which only seeds this project's own
+np.random usage) gives ULP-level differences in eigenvalue/eigenvector
+routines. This is a well-known property of multi-threaded LAPACK, not a
+logic error in this project's code.
+
+Checked whether it changes anything that was actually reported: diffed
+p9_spearman_vs_ground_truth.csv, p7_dominant_mode_ward_ranking.csv, and
+p6_spectral_summary.csv against HEAD -- zero differences in all three.
+The EDMD/eigenmode pipeline (which is what feeds REPORT.md's numbers)
+never touches nx.eigenvector_centrality_numpy at all; that function is
+only used for the P2/P9 network-centrality *baselines* compared against
+the Koopman scores, and even there the ~1e-15 noise does not move any
+rank or any rounded value that appears in REPORT.md or the slides.
+
+Conclusion: benign floating-point non-determinism from multi-threaded
+BLAS, confined to the eigenvector-centrality baseline and its dependent
+plot layout, not a code bug, and provably not affecting any reported
+result. Reverted the 5 noise-only files to their committed versions
+(re-running would just reintroduce the same class of ULP noise, so
+there is nothing meaningful to commit). Not treating this as a
+reproducibility violation of decision #16, which governs config.SEED /
+this project's own simulation randomness -- true bit-for-bit
+determinism of every downstream float would additionally require
+pinning OPENBLAS_NUM_THREADS=1 in the environment, which is an
+environment-level knob, not project code, and is not worth constraining
+given it changes nothing that is reported. Logged here rather than
+silently reverting so this is documented if the discrepancy is noticed
+again in a future re-run.
