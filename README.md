@@ -1,63 +1,91 @@
 # P30: Koopman/EDMD Forecasting of MRSA Spread on a Hospital Contact Network
 
 CMDS course project (M.Tech Data Science, Amrita Vishwa Vidyapeetham), topic P30.
+
 Lifts ward-level MRSA colonization observables from a dynamic patient-contact
 graph into a Koopman-operator framework via EDMD, forecasts outbreak
 trajectories, and evaluates Koopman-eigenmode-based superspreader-ward
 targeting against simple network centrality.
 
-See [REPORT.md](REPORT.md) for the full technical report and
-[CLAUDE.md](CLAUDE.md) for the locked project plan. [research_log.md](research_log.md)
-is the phase-by-phase engineering log (every verified number, design decision,
-and bug caught, in the order it happened).
+| Document | Purpose |
+|---|---|
+| [REPORT.md](REPORT.md) | Full technical report |
+| [CLAUDE.md](CLAUDE.md) | Locked project plan and working rules |
+| [research_log.md](research_log.md) | Phase-by-phase log: every verified number, design decision, and bug caught, in the order it happened |
+
+## Contents
+
+- [Data](#data)
+- [Setup](#setup)
+- [Reproducing the full pipeline](#reproducing-the-full-pipeline)
+- [Running tests](#running-tests)
+- [Project structure](#project-structure)
+- [Key results](#key-results-see-reportmd-for-full-detail)
+- [Limitations](#limitations)
+- [Citation](#citation)
 
 ## Data
 
-Source: I-Bird study (Obadia et al. 2015, *PLOS Comput Biol* 11(3):e1004170;
-Duval et al. 2018, *Sci Rep* 8:1686), a 200-bed long-term/rehabilitation
-hospital, Berck-sur-Mer, France, 2009. The raw CSVs are **not** included in
-this repository (`data/` is gitignored — license unverified). To reproduce:
-place `admission.csv`, `mat.day.csv`, and `microbio.csv` in `data/raw/`.
+Source: I-Bird study, a 200-bed long-term/rehabilitation hospital in
+Berck-sur-Mer, France, 2009 — see [Citation](#citation).
+
+The raw CSVs are **not** included in this repository (`data/` is gitignored;
+dataset license unverified). To reproduce, place these three files in
+`data/raw/`:
+
+- `admission.csv` — person -> ward/group
+- `mat.day.csv` — daily contact edges
+- `microbio.csv` — MRSA swab results
 
 ## Setup
 
 ```bash
 python -m venv .venv
-# Windows:   .venv\Scripts\activate
-# Mac/Linux: source .venv/bin/activate
+```
+
+```bash
+# Windows
+.venv\Scripts\activate
+# Mac/Linux
+source .venv/bin/activate
+```
+
+```bash
 pip install -r requirements.txt
 ```
 
 ## Reproducing the full pipeline
 
-Each phase's orchestrator script reads the previous phases' saved outputs
-from `data/processed/` and `results/`, so they must be run in order:
+Run everything in one command:
 
 ```bash
 python run_all.py
 ```
 
-or individually, in order:
+Each phase reads the previous phases' saved outputs from `data/processed/`
+and `results/`, so if running manually, the order below must be preserved:
 
-```bash
-python -m src.audit              # P1: data audit
-python -m src.build_network      # P2: contact network + ward matrix W
-python -m src.build_states       # P3: real weekly prevalence
-python -m src.build_simulation   # P4: SIS simulation + calibration
-python -m src.build_observables  # P5: EDMD dictionaries + train/val/test split
-python -m src.build_edmd         # P6: EDMD fit
-python -m src.build_eigen        # P7: eigenmode analysis
-python -m src.build_p8           # P8: forecasting, validation, baselines
-python -m src.build_p9           # P9: superspreader ward risk score vs centrality
-python -m src.build_p10          # P10: intervention simulation
-python -m src.build_p11          # P11: robustness experiments E1-E8
-```
+| Phase | Command | Produces |
+|---|---|---|
+| P1 | `python -m src.audit` | Data audit |
+| P2 | `python -m src.build_network` | Contact network + ward matrix W |
+| P3 | `python -m src.build_states` | Real weekly prevalence |
+| P4 | `python -m src.build_simulation` | SIS simulation + calibration |
+| P5 | `python -m src.build_observables` | EDMD dictionaries + train/val/test split |
+| P6 | `python -m src.build_edmd` | EDMD fit |
+| P7 | `python -m src.build_eigen` | Eigenmode analysis |
+| P8 | `python -m src.build_p8` | Forecasting, validation, baselines |
+| P9 | `python -m src.build_p9` | Superspreader ward risk score vs. centrality |
+| P10 | `python -m src.build_p10` | Intervention simulation |
+| P11 | `python -m src.build_p11` | Robustness experiments E1-E8 |
 
-Run the test suite with:
+## Running tests
 
 ```bash
 pytest tests/ -v
 ```
+
+179 tests, one file per `src/` module.
 
 ## Project structure
 
@@ -68,7 +96,7 @@ src/                 one module per concern (load, network, states, simulate,
                       calibrate_sim, trajectories, observables, edmd, eigen,
                       forecast, baselines, metrics, risk, intervention,
                       robustness), plus one build_p*.py orchestrator per phase
-tests/               pytest suite, one file per src/ module (179 tests)
+tests/               pytest suite, one file per src/ module
 results/figures/     every plot generated by the pipeline
 results/tables/      every CSV/table generated by the pipeline
 results/models/      fitted EDMD operators (K, scaler, readout) per dictionary
@@ -80,19 +108,37 @@ REPORT.md            the full technical report
 
 ## Key results (see REPORT.md for full detail)
 
-- **P6 (EDMD fit)**: proved analytically and confirmed empirically that the
-  contact-weighted dictionary D3 adds no function space beyond the plain
-  polynomial dictionary D2 (D3's fitted operator has rank 19 of 25, exactly
-  matching the theoretical ceiling).
-- **P9 (superspreader validation)**: simple ward-level degree centrality
-  predicts the simulated superspreader ground truth far better (Spearman
-  rho=0.94) than any of the three Koopman eigenmode risk scores (rho
-  0.26-0.54) — an honest, not-reframed negative result for the project's
-  central premise.
-- **P10 (intervention simulation)**: targeting *any* reasonable risk score
-  beats spreading effort thin (whole-hospital) or picking blindly (random)
-  by a wide margin; which specific score wins depends on the target count
-  (k=1 vs k=2).
-- **P11 (robustness)**: every major conclusion is stable across seed choice,
-  replicate count, calibration point, network time-window, population
-  definition, missing-data handling, and lambda choice.
+**P6 — EDMD fit.** Proved analytically and confirmed empirically that the
+contact-weighted dictionary D3 adds no function space beyond the plain
+polynomial dictionary D2: D3's fitted operator has rank 19 of 25, exactly
+matching the theoretical ceiling.
+
+**P9 — superspreader validation.** Simple ward-level degree centrality
+predicts the simulated superspreader ground truth far better
+(Spearman rho = 0.94) than any of the three Koopman eigenmode risk scores
+(rho 0.26-0.54) — an honest, not-reframed negative result for the project's
+central premise.
+
+**P10 — intervention simulation.** Targeting *any* reasonable risk score
+beats spreading effort thin (whole-hospital) or picking blindly (random) by
+a wide margin; which specific score wins depends on the target count
+(k=1 vs. k=2).
+
+**P11 — robustness.** Every major conclusion is stable across seed choice,
+replicate count, calibration point, network time-window, population
+definition, missing-data handling, and lambda choice.
+
+## Limitations
+
+- About 16 real weekly snapshots only.
+- Time-invariant Koopman operator fit against a time-varying contact network.
+- Only 6 groups, so rank statistics are weak.
+- No admission/discharge dates; contact network only, no transfer records.
+- Single hospital, single 4-month observation window.
+
+## Citation
+
+If referencing the underlying dataset, cite:
+
+- Obadia et al. 2015, *PLOS Computational Biology* 11(3):e1004170.
+- Duval et al. 2018, *Scientific Reports* 8:1686.
