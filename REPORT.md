@@ -326,7 +326,7 @@ and historical-mean.
 
 **Result.** On the holdout period (weeks 12–16, the one period untouched by
 any model's fitting), **D1/D2/D3 are statistically indistinguishable from
-persistence at h=1** (RMSE 0.0465–0.0466 vs. persistence's 0.0464 — skill
+persistence at h=1** (RMSE 0.0464–0.0466 vs. persistence's 0.0464 — skill
 scores of −0.001 to −0.006). At longer horizons (h=3–4), the
 historical-mean baseline overtakes everything (skill ≈0.20 vs. persistence)
 — a well-known, defensible phenomenon: naive climatology beats both
