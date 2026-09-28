@@ -34,7 +34,6 @@ from src.metrics import compute_metrics_from_long
 from src.network import assign_week, build_master_edge_list, ward_contact_matrix
 from src.risk import ward_degree_centrality
 from src.simulate import build_person_index, simulation_day_list
-from src.wards import person_ward_map
 
 
 def rank_stability(baseline_scores, alt_scores, groups):
@@ -329,7 +328,6 @@ def _d3_reduced_features(states, group_names, W):
     Wx contributes ZERO rank beyond x, since W is invertible): [1, x, x^2,
     x*(Wx)] instead of D3's full [1, x, x^2, Wx, x*(Wx)]."""
     X = np.asarray(states, dtype=float)
-    n = X.shape[-1]
     ones = np.ones(X.shape[:-1] + (1,))
     squares = X**2
     Wx = X @ W.T
@@ -351,7 +349,7 @@ def e8_d3_structural_redundancy(setup):
     the full D3's. If the theory is right, dropping a block that
     contributes no independent information should barely change
     anything."""
-    from src.build_edmd import lambda_selection_criterion, select_lambda
+    from src.build_edmd import select_lambda
     from src.edmd import build_pairs_within_trajectory
     from src.eigen import dominant_ward_relevant_mode, eigendecompose, mode_table, mode_ward_patterns, null_space_rank_cutoff
 

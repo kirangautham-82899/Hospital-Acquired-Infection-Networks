@@ -50,8 +50,8 @@ def edmd_forecast_real(model, weekly_states, states_real, groups, max_h, dict_na
     for h=1..max_h. Returns a list of records: {model, start_week,
     landing_week, period, h, pred [n_groups] raw units, actual [n_groups]
     raw units (filled), scoring_mask [n_groups] bool}."""
-    K, scaler, C, feature_names = model["K"], model["scaler"], model["C"], model["feature_names"]
-    group_indices = [feature_names.index(f"x_{g}") for g in groups]
+    K, scaler, feature_names = model["K"], model["scaler"], model["feature_names"]
+    group_indices = [feature_names.index(f"x_{g}") for g in groups]  # equivalent to model["C"] @ phi, indices only
     dict_fn = DICTIONARIES[dict_name]
 
     records = []

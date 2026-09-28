@@ -1,7 +1,5 @@
 """Tests for src/audit.py: the derived numbers reported by the P1 audit,
 checked against the reference numbers recorded in CLAUDE.md."""
-import pandas as pd
-
 import config
 from src.load import load_admission, load_contacts, load_microbio
 from src.audit import (

@@ -29,7 +29,6 @@ not just contact among people already confined to it.
 import numpy as np
 import pandas as pd
 
-import config
 from src.calibrate_sim import calibration_initial_state, replicate_seed_pairs
 from src.simulate import daily_edge_arrays, simulate_sis
 from src.wards import person_ward_map

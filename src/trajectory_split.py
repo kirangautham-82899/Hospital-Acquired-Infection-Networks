@@ -31,11 +31,11 @@ def make_split(metadata, seed=None):
         n = len(ids)
         n_train = int(round(n * TRAIN_FRAC))
         n_val = int(round(n * VAL_FRAC))
-        n_test = n - n_train - n_val  # remainder, so counts always sum to n regardless of rounding
 
         assignment = (
             [("train", tid) for tid in ids[:n_train]]
             + [("val", tid) for tid in ids[n_train : n_train + n_val]]
+            # remainder (not a separately rounded n_test) goes to test, so counts always sum to n
             + [("test", tid) for tid in ids[n_train + n_val :]]
         )
         for split, tid in assignment:

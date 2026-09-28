@@ -29,7 +29,6 @@ with a person's last known result (positive or negative) for up to 2
 weeks, which is not a real observation. Never treat it as a validation
 target.
 """
-import numpy as np
 import pandas as pd
 
 import config

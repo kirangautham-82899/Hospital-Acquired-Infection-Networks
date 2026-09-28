@@ -248,7 +248,7 @@ def build():
         print(f"  best lambda={result['best_lambda']:.4g}, spectral radius={result['spectral'].iloc[0]['spectral_radius']:.4f}, "
               f"eigenvalues outside unit circle={result['spectral'].iloc[0]['n_eigenvalues_outside_unit_circle']}")
         print(f"  rank(K)={rank} of {len(result['feature_names'])} features")
-        print(f"  test set, h=1, overall RMSE by model:")
+        print("  test set, h=1, overall RMSE by model:")
         print(test_overall[["model", "rmse", "rmse_clipped", "skill_vs_persistence"]].to_string(index=False))
 
     pd.DataFrame(rank_rows).to_csv(config.RESULTS_TABLES_DIR / "p6_effective_rank.csv", index=False)

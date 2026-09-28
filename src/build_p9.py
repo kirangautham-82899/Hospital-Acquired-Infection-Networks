@@ -13,7 +13,6 @@ Writes:
   results/figures/p9_ground_truth_bar.png
   results/figures/p9_rank_heatmap.png
 """
-import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 

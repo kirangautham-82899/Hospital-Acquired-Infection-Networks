@@ -2,8 +2,6 @@
 and coverage. Writes results/tables/p1_dataset_report.txt plus a few
 supporting CSVs. Never modifies data/raw/.
 """
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 

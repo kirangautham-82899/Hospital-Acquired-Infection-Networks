@@ -25,7 +25,7 @@ import pandas as pd
 
 import config
 from src.network import assign_week
-from src.simulate import daily_edge_arrays, simulate_sis, simulation_day_list
+from src.simulate import simulate_sis
 from src.wards import person_ward_map
 
 

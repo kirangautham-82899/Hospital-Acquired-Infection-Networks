@@ -108,10 +108,7 @@ def test_known_analytic_transmission_probability_two_person_network():
     single day. Empirical P(B infected) over many replicates should match
     the analytic 1 - exp(-beta*H) within a tight Monte Carlo tolerance."""
     people, index = build_person_index(["A", "B"])
-    day = simulation_day_list()[0]
     hours = 2.0
-    edges = pd.DataFrame([{"day": day, "u": "A", "v": "B", "seconds": hours * 3600.0}])
-    edge_arrays = daily_edge_arrays(edges, index)
 
     beta = 0.05
     analytic_p = 1 - np.exp(-beta * hours)

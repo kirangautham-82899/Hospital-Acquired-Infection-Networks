@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import config
 from src.build_edmd import lambda_selection_criterion, load_p6_inputs, select_lambda
 from src.edmd import ConstantAwareScaler, build_pairs_within_trajectory, ridge_fit
 

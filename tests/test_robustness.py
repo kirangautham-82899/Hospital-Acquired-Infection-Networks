@@ -71,7 +71,7 @@ def test_e5_calibration_week_contacts_are_a_subset():
     contacts to the calibration weeks should strictly reduce row count
     and total contact-seconds relative to the whole period."""
     from src.load import load_admission, load_contacts
-    from src.network import assign_week, build_master_edge_list, ward_contact_matrix
+    from src.network import assign_week, ward_contact_matrix
 
     admission = load_admission(config.ADMISSION_CSV)
     contacts = load_contacts(config.CONTACTS_CSV)

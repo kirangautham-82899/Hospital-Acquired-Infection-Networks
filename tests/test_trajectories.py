@@ -86,7 +86,7 @@ def test_weekly_mean_prevalence_matches_hand_calculation():
 @pytest.fixture(scope="module")
 def small_sim_inputs():
     from src.load import load_admission, load_contacts
-    from src.network import build_master_edge_list, filter_edges
+    from src.network import build_master_edge_list
     from src.simulate import daily_edge_arrays
 
     admission = load_admission(config.ADMISSION_CSV)

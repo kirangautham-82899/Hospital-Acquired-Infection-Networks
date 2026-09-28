@@ -34,7 +34,6 @@ def hand_check(microbio, admission, network_people, checks):
     """Independently recompute prevalence for a few (week, group) cells
     straight from raw microbio.csv (own date filter + own groupby, not
     calling src.states), to cross-check the pipeline output."""
-    from src.network import assign_week
     from src.wards import person_ward_map
 
     ward_of = person_ward_map(admission)

@@ -165,7 +165,7 @@ def test_pairs_never_cross_trajectory_boundary():
 
 
 def test_gather_rolling_starts_respects_horizon_and_split():
-    n_traj, n_weeks = 3, 17
+    n_weeks = 17
     trajectory_ids = np.array([0, 1, 2])
     split_df = pd.DataFrame({"trajectory": [0, 1, 2], "split": ["train", "val", "train"]})
     rows, t_starts = gather_rolling_starts(trajectory_ids, split_df, "train", max_h=4, n_weeks=n_weeks)

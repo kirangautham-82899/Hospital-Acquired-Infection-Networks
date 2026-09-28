@@ -8,8 +8,6 @@ Writes results/tables/raw_hashes.txt. Never writes into data/raw/.
 """
 import csv
 import hashlib
-import subprocess
-import sys
 from pathlib import Path
 
 import config

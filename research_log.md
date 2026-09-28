@@ -945,3 +945,61 @@ verified against full D3 (both single-sample and batched), and integration
 checks confirming the raw ingredients E4/E5 depend on (a genuine ridge
 with >1 near-best point; calibration-week contacts are a strict subset of
 the whole period). 179 tests total, all passing.
+
+Sep 28: P12 report, slides, cleanup done. Asked the user for format
+preferences before starting (report format, slides format, report
+length) rather than guessing on a final human-facing deliverable, unlike
+earlier phases where judgment calls were made and logged after the fact --
+this one was cheap to ask and expensive to redo. Chose: Markdown report
+in-repo, full technical detail, PowerPoint slides.
+
+Cleanup:
+- Ran pyflakes (installed temporarily, then uninstalled -- not a project
+  dependency, just a one-off lint pass) across src/, config.py, tests/,
+  and verify_p1.py. Fixed every finding in src/ and config.py (13 items:
+  unused imports, one unused-but-harmless local variable revealing a
+  simplification opportunity in src/forecast.py -- C was unpacked from
+  model["C"] but group_indices-based slicing already does the same job,
+  so the unused variable was a real (harmless) redundancy worth removing,
+  not just a lint nag). Left conventional `import pytest` in test files
+  even where unused directly (idiomatic for a test module). Re-ran the
+  full test suite after every batch of fixes, not just once at the end --
+  179 passed throughout, no behavior changed by any cleanup edit.
+- Added README.md (setup, reproduction instructions, project structure,
+  key-results summary) and run_all.py (runs P1-P11 in order via each
+  phase's build()/build_report() entry point -- verified every module's
+  actual entry-point name before wiring it in, since src/audit.py uses
+  build_report() while every later phase uses build()).
+- requirements.txt regenerated via pip freeze after removing the
+  temporary pyflakes install and adding python-pptx (needed to reproduce
+  the slides, not the core analysis pipeline).
+
+REPORT.md: full technical report (abstract through conclusion, references,
+two appendices), built directly from research_log.md's verified numbers
+-- not from memory. Caught and fixed one transcription error before
+publishing: an early draft stated D1's dominant-mode Menard 1 share as
+"61%"; cross-checked against the actual research_log.md entry and the
+value is 45.2% (share=0.452) -- corrected before this report was
+finalized. Independently spot-checked half a dozen other headline numbers
+(P9's Spearman table, P4's calibrated params, P6's effective ranks and
+selected lambdas, P8's holdout RMSE/skill table, P10's k=2/R=75% row)
+directly against their source results/tables/*.csv files rather than
+trusting the earlier prose a second time -- all matched exactly.
+
+P30_slides.pptx: 22-slide deck (build_slides.py, a one-off report-
+generation script, not part of the src/ analysis pipeline) mirroring
+REPORT.md's structure, with 5 real figures embedded (the ward-colored
+network, D3's eigenvalue spectrum, the P9 ground-truth bar chart and rank
+heatmap, and P10's drop-vs-budget comparison) plus a Spearman-rho table
+and a robustness-summary table pulling the same verified numbers as the
+report. Caught a rendering bug before treating the deck as finished: two
+slide titles used an embedded "\n" inside a single-paragraph .text
+assignment, which python-pptx does not render as a line break -- the
+title text ran together ("MRSA Spreadon a..."). Fixed by using separate
+paragraphs per line instead of relying on an embedded newline; re-
+extracted every slide's title text programmatically after the fix and
+visually confirmed all 22 render correctly, rather than assuming the fix
+worked from the code alone.
+
+Final state: 179 tests passing, README.md + REPORT.md + P30_slides.pptx +
+run_all.py added, all cleanup fixes applied, requirements.txt current.
