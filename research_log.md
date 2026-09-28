@@ -449,3 +449,94 @@ quadratic recovery, closed-form ridge agreement, selector correctness,
 train-only scaler, no cross-trajectory pairs, unpenalized-constant shift
 invariance), plus the D3 rank confirmation on real data. 128 tests total,
 all passing.
+
+Sep 28: P7 eigenmodes done (src/eigen.py, src/build_eigen.py). CLAUDE.md
+doesn't lock specific decisions for this phase beyond the phase name, so
+judgment calls were made and are logged here (asked to proceed on my own
+judgment for the open questions raised before starting).
+
+Design choices:
+- D3's null-space filter uses rank(K) (from P6, already verified) as the
+  cutoff: keep the top rank(K) eigenvalues by magnitude, flag the rest
+  spurious. Checked empirically before trusting this, not assumed: D3's
+  eigenvalue magnitudes have a ~2.5 x 10^12 gap between the 19th and 20th
+  largest (0.0026 vs 1.0e-15) -- completely unambiguous, not a fuzzy
+  threshold call. D1 and D2 (full rank) have nothing filtered.
+- Eigenvector un-scaling: K was fit in P6's SCALED space. Ward-space mode
+  shapes need the eigenvector mapped back to original prevalence units
+  via the SAME similarity transform relationship P5/P6 anticipated.
+  Derived it carefully (K_z = D^-1 K_orig D with D=diag(scale), so
+  K_z v=lambda v implies K_orig(D v)=lambda(D v)) and verified against a
+  synthetic similarity-transform case before trusting it on real data.
+- Mode ward "share" = |mode_ward_pattern_i| / sum(|mode_ward_pattern|)
+  across wards (sums to 1, easy to read as a relative risk-contribution,
+  and directly comparable to P9's eventual risk-score work).
+- Complex-conjugate pairs are kept as separate rows (both ARE distinct
+  eigenvalues/eigenvectors of a real K) but cross-referenced via a
+  conjugate_partner column, so a reader doesn't double-count one
+  oscillatory phenomenon as two unrelated modes.
+- Dominant mode = the largest-magnitude mode that survives both filters
+  (not spurious, not a zero ward pattern) -- for D1/D2/D3 on the real
+  data this is simply the single largest-magnitude eigenvalue, since
+  nothing gets filtered by the zero-ward-pattern check (see correction
+  below).
+
+TWO BUGS CAUGHT BY TESTS BEFORE THIS WAS TRUSTED, one of them a real
+mathematical reasoning error on my part, not just a coding slip:
+1. Eigenvector un-scaling direction. First draft divided by scale_
+   (v / scale_); the correct relationship (re-derived and checked against
+   a synthetic K_orig / K_scaled pair before accepting it) is MULTIPLY
+   (v * scale_). This is not a nitpick -- dividing vs multiplying by
+   scale factors that are all within an order of magnitude of each other
+   can look "plausible" without an obvious red flag, so this would have
+   silently produced wrong ward-mode interpretations without the test
+   catching it.
+2. Reasoning error about a "trivial constant-feature mode". Original
+   assumption: since every dictionary's constant feature makes K's row 0
+   exactly [1,0,...,0] (verified in P6), the constant basis direction e_0
+   would be an eigenvector with a ward-space pattern of exactly 0 (since
+   readout C never selects it), so every dictionary should show exactly
+   one "trivial" mode to filter. Built a filter for this and it found
+   ZERO such modes on the real D1/D2/D3 data -- investigated rather than
+   forcing the filter to "work": row 0 = [1,0,...,0] makes e_0 a LEFT
+   eigenvector of K (e_0^T K = e_0^T, confirmed exactly), which is a
+   completely different thing from a RIGHT eigenvector (K v = lambda v,
+   what mode decomposition x(t) = C sum v_i lambda_i^t b_i actually
+   uses). K's COLUMN 0 (the intercept for every output) is nonzero almost
+   everywhere (checked directly on the real D1 model), so e_0 is not
+   close to any right eigenvector. CORRECTED CONCLUSION: the
+   eigenvalue-closest-to-1 mode is NOT a trivial artifact to discard --
+   it is the system's genuine steady-state/equilibrium ward pattern, and
+   its content is real information. Renamed the (still useful as a
+   general defensive check, just not tied to the constant specifically)
+   column from trivial_constant_mode to zero_ward_pattern to stop the
+   code from asserting something false about what it measures.
+
+RESULT, reported honestly including a disagreement I didn't try to paper
+over: the dominant (near-|lambda|=1, most persistent) mode's top ward
+differs between dictionaries. D1 (linear only): Menard 1 dominates
+(share=0.452), lambda=1.00000 exactly. D2 and D3 agree with each other:
+Sorrel 1 dominates (share=0.418 and 0.415), lambda=1.0138 (D2, notably
+>1 -- technically slowly growing, not an exact fixed point) and
+lambda=1.00035+0.00091j (D3, complex but with an enormous ~6901-week
+period, i.e. non-oscillatory on any timescale this data could show).
+Plausible explanation, not confirmed: D2/D3's nonlinear (quadratic) terms
+change the fitted dynamics' equilibrium structure relative to D1's plain
+linear/VAR(1)-type model, and D2/D3 agreeing with each other while D1
+differs suggests the nonlinear dictionaries may be capturing something
+more consistent -- but this is exactly the kind of claim P9's proper
+validation against the simulated intervention ground truth (cut a ward's
+contacts 50%, measure the person-days drop) needs to check, not something
+to assert from eigenmodes alone. D3's 6 spurious null-space eigenvalues
+sit near the origin, cleanly separated from the 19 ward-relevant ones
+clustered near the unit circle (visually confirmed in
+p7_eigenvalue_spectrum_D3.png).
+
+Files: results/tables/p7_modes_D*.csv (every mode, full detail),
+p7_dominant_mode_ward_ranking.csv (cross-dictionary comparison);
+results/figures/p7_eigenvalue_spectrum_D*.png (complex plane, unit circle,
+modes colored by filter status), p7_dominant_mode_wards_D*.png (ward bar
+chart for the dominant mode).
+
+12 new tests (tests/test_eigen.py) -- including the two that caught the
+bugs above -- all passing alongside the existing 128 (140 total).
