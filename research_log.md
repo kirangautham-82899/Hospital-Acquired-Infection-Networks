@@ -657,3 +657,100 @@ baselines on noiseless synthetic data, an end-to-end integration check
 applying the real fitted D1 model to real P3 data, and the two wiring
 tests that caught the argument-order bug above. 159 tests total, all
 passing.
+
+Sep 28: P9 superspreader ward risk score vs centrality done
+(src/intervention.py, src/risk.py, src/build_p9.py). This is the phase
+that actually tests the project's central premise ("identify
+superspreader-ward eigenmodes for targeted infection-control
+intervention"), so the result below is reported in full rather than
+summarized away.
+
+Design choices:
+- "Cut a ward's contacts by 50%" = scale EVERY edge touching that ward
+  (either endpoint), not just within-ward edges -- a real intervention
+  (cohorting, restricted movement) reduces a ward's overall activity,
+  including its contact with other wards, not just internal contact.
+- Ground truth uses the SAME calibrated (beta, gamma, epsilon) and
+  calibration initial condition as P4 (never re-calibrated), with common
+  random numbers (same 100 replicate seed pairs) for baseline and every
+  intervention -- a paired, variance-reduced comparison, same technique
+  as P4's grid search and P6's lambda selection.
+- Risk score candidates: the P7 Koopman dominant-mode ward shares (one
+  per dictionary), plus three ward-level centrality measures computed
+  directly from P2's raw ward contact matrix (never previously computed
+  at ward granularity, only person-level in P2): degree/strength
+  (row sum -- a ward's total contact-seconds exposure), eigenvector
+  centrality, and betweenness centrality (both on the symmetrized W,
+  since raw W is directed).
+- Compared via ranks (1=highest) across all 6 wards AND Spearman
+  correlation against the ground truth, with an explicit caveat
+  (CLAUDE.md's own known limitation: "Only 6 groups, so rank statistics
+  are weak") printed alongside every correlation number, not just
+  mentioned once.
+
+TEST DESIGN CORRECTION, caught before trusting the experiment: the first
+version of the bridge-topology correctness test seeded the initial
+infection INSIDE one of the three compared wards (a bridge B between
+leaf wards A and C) and expected cutting B to show the biggest effect.
+It failed -- cutting A (the SEED's own ward) showed a bigger drop than
+cutting the bridge B. Investigated rather than weakened the assertion:
+this is a real, sensible effect (cutting the source ward's contacts
+throttles the epidemic at its most sensitive, earliest stage, which
+compounds over the following weeks -- a bigger effect than a downstream
+topological bridge for a single-seed start), just not what the test was
+trying to isolate. Redesigned with a 4th ward D (the seed source,
+excluded from the compared groups) connected only through the bridge B,
+so all three compared wards are equally "downstream" of the seed and
+only their topological role differs -- this version correctly confirmed
+B (bridge) > A, C (leaves).
+
+MAIN RESULT, the actual point of this phase: on the real network (100
+replicates per ward, common random numbers), the ground-truth drop in
+colonized person-days ranks Menard 1 > Sorrel 1 > Menard 2 > Sorrel 2 >
+Sorrel 0 > Other (p9_ground_truth_bar.png). Comparing candidates via
+Spearman rho against this ranking:
+    degree_centrality        0.943  (p=0.0048)
+    eigenvector_centrality   0.714  (p=0.111)
+    koopman_D2                0.543  (p=0.266)
+    koopman_D3                0.429  (p=0.397)
+    betweenness_centrality    0.309  (p=0.552)
+    koopman_D1                 0.257  (p=0.623)
+SIMPLE DEGREE CENTRALITY -- literally just each ward's row sum in the
+already-computed P2 ward contact matrix, no Koopman machinery required --
+predicts the simulated ground truth far better than any of the three
+Koopman eigenmode risk scores, and is the only candidate whose
+correlation survives even a rough Bonferroni correction for testing 6
+candidates (0.05/6=0.0083; degree_centrality's p=0.0048 clears that,
+nothing else does). None of the three Koopman scores reach conventional
+significance. This is an honest negative-ish result for the project's
+central premise and is reported as such, not reframed. One nuance worth
+keeping in mind rather than either dismissing or over-crediting D1:
+koopman_D1 correctly picks Menard 1 as the #1 ward (matching P7's finding
+that D1's dominant mode was Menard-1-dominated, while D2/D3's was Sorrel-
+1-dominated -- P7 flagged this disagreement for exactly this validation
+step) but scrambles the ordering of the remaining 5 wards badly enough
+that its OVERALL rank correlation (0.257) is the worst of the three
+Koopman variants -- getting the top pick right is not the same as good
+rank agreement throughout, and both facts are true simultaneously.
+Caveat carried from CLAUDE.md's own known limitations and repeated here
+deliberately: n=6 wards is a very small sample for any rank statistic:
+the reported correlations and p-values should be read as descriptive,
+not confirmatory, findings. The per-replicate variability in the ground-
+truth experiment is also substantial (visible in p9_ground_truth_bar.png's
+error bars, which show per-replicate std, not the tighter standard error
+of the 100-replicate mean -- the means themselves, which is what's
+actually compared/correlated, are considerably more precise than the raw
+per-replicate spread suggests, but the underlying stochastic simulation
+noise is real and should not be understated either).
+
+Files: results/tables/p9_ground_truth_intervention.csv,
+p9_ward_scores.csv (raw), p9_ward_ranks.csv,
+p9_spearman_vs_ground_truth.csv; results/figures/p9_ground_truth_bar.png,
+p9_rank_heatmap.png (visually confirms the same pattern: ground_truth,
+degree_centrality, and eigenvector_centrality columns look similar; the
+three koopman columns look comparatively scrambled).
+
+12 new tests (tests/test_intervention.py, test_risk.py), including the
+corrected bridge-topology experiment-correctness test and hand-checkable
+centrality tests (star graph for eigenvector, path graph for
+betweenness). 167 tests total, all passing.
