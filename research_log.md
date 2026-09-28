@@ -333,3 +333,119 @@ splits=#14, seeds=#18 -- content followed, CLAUDE.md still not renumbered):
 - 25 new tests (tests/test_observables.py, test_trajectory_split.py,
   test_real_state_fill.py), all passing alongside the existing 97 (112
   total).
+
+Sep 28: P6 EDMD fit done (src/edmd.py, src/build_edmd.py). This is the
+"first review" milestone phase per CLAUDE.md's Phases list. Plan numbers
+per the latest correction: SIS=#9, calibration=#10, scenarios=#11,
+splits=#14, seeds=#18 -- content followed throughout, CLAUDE.md still not
+renumbered (no full Part A numbering in hand yet).
+
+MAJOR FINDING, verified both analytically and empirically before building
+anything on top of it: D3 adds NO new function space beyond D2. Proof: for
+a fixed W, (Wx)_i = sum_j W_ij x_j is a LINEAR function of x, so it is
+already in D1's span; since P2's W is invertible (checked: all 6
+eigenvalues nonzero, smallest 0.443), Wx spans EXACTLY the same subspace
+as x -- 0 new rank. x_i*(Wx)_i = sum_j W_ij x_i x_j is a fixed linear
+combination of D2's existing x_i^2 and cross terms -- also no new rank
+beyond D2. So D3's 25 raw features have effective rank <= 1+6+6+6=19 (the
+Wx block, 6 of them, is exactly redundant given x). This was CONFIRMED
+empirically: the fitted K for D3 has rank(K)=19 of 25 on the real
+training data (test_d3_fitted_rank_matches_theoretical_prediction_on_real_
+data), exactly matching the theoretical ceiling, while D1 (rank 7 of 7)
+and D2 (rank 28 of 28) are both full rank. Consequence for language used
+throughout this project from now on: D3 should be described as "tests
+whether a contact-structured prior helps generalization" -- NEVER "D3
+injects network information", since it structurally cannot add
+information beyond D2. A genuinely network-aware dictionary would need the
+WEEK-SPECIFIC contact matrix W_t (since W_t x_t is then not a function of
+x_t alone) -- noted as optional future work, not part of the locked plan.
+FLAG FOR P7: D3's K will have near-zero eigenvalues from this null space
+-- filter them before eigenmode interpretation.
+
+P6 plan fixes, all implemented:
+1. Standardization: only the non-constant features are centered/scaled
+   (ConstantAwareScaler); the constant feature (index 0 in every
+   dictionary) is kept exactly 1 and excluded from the ridge penalty.
+   Fitted on the TRAINING split only (test_scaler_fitted_on_train_only).
+   Confirmed the shift-invariance property mathematically and by test
+   (test_shifted_target_shifts_only_constant_column): shifting every
+   target by a constant vector c changes ONLY K's constant column (by
+   exactly c), leaving every other (penalized) coefficient bit-identical
+   -- this is only true if the constant is genuinely unpenalized, so it's
+   a strong correctness check on the implementation, not just the design.
+2. Snapshot pairs are built strictly within each trajectory
+   (build_pairs_within_trajectory) -- week 16 of one trajectory is never
+   paired with week 0 of the next. Verified with a synthetic array where
+   each trajectory's values encode their own id, so any cross-trajectory
+   contamination would be immediately detectable (it wasn't).
+3. Solver: ridge via lstsq on the augmented system [X; sqrt(lambda)*P]
+   (P = diag(0, 1, ..., 1), zero at the constant's position), never an
+   explicit (X'X + lambda I)^-1 -- important given D3's near-singular X.
+   Verified against the closed-form ridge solution
+   (X'X+D)^-1 X'Y on synthetic data (test_ridge_fit_matches_closed_form_
+   solution) and via exact recovery of a known noiseless linear system
+   (D1) and a known noiseless quadratic map (D2).
+4. Lambda selection: grid = 20 log-spaced points, 1e-6 to 1e3, per
+   dictionary. Selected on the VALIDATION split (P5's saved
+   trajectory_split.csv), scoring the mean RMSE over forecast horizons
+   1-4 (K, K^2, K^3, K^4 applied to phi(x_t), rolled forward from every
+   valid t in each validation trajectory, not just t=0) IN ORIGINAL
+   PREVALENCE UNITS via the readout C and the scaler's inverse transform
+   -- never on the raw lifted vector. Auto-widens once (3x extension) if
+   the best point lands on a grid edge, same pattern as P4. Test split
+   touched exactly once, after lambda and K were fixed from train+val.
+   Selected lambda: D1=4.28, D2=1.44, D3=1.44 (none landed on an edge).
+   NOTE: the validation curve is remarkably FLAT across ~6 orders of
+   magnitude (1e-6 to ~1) before rising sharply past lambda~10 (see
+   p6_lambda_curve_D3.png) -- regularization strength barely matters
+   across a huge range, consistent with P4's finding that the calibrated
+   dynamics are simple/near-static and only weakly identified by the
+   available data.
+5. Reporting (results/tables/p6_metrics_D*.csv): RMSE and MAE, train/val/
+   test, overall and per-ward, h=1-4, split by scenario (endemic/
+   outbreak), raw and clipped-to-[0,1], with skill score vs persistence
+   (1 - RMSE_model/RMSE_persistence). Spectral radius and count of
+   eigenvalues outside the unit circle per dictionary
+   (p6_spectral_summary.csv). Lambda curves and a 1-step predicted-vs-
+   actual scatter per dictionary in results/figures/.
+6. HONEST RESULT, as anticipated: D1, D2, and D3 perform almost
+   identically (test h=1 RMSE: D1=0.00748, D2=0.00758, D3=0.00747), all
+   beating persistence by a modest ~12-13% at h=1, growing to ~25-27% by
+   h=4 (skill score improves with horizon since persistence degrades
+   faster than the fitted models). training_mean is a much worse baseline
+   (skill as low as -12.5) since each trajectory sits near its own,
+   trajectory-specific level rather than a shared global mean. D3 edges
+   out D2 very slightly at every horizon despite having strictly less
+   effective capacity (rank 19 vs 28) -- a small, concrete instance of the
+   "fewer effective parameters can generalize marginally better"
+   mechanism named in the D3 finding above, though the margin is small
+   enough not to over-claim. D2 does not meaningfully beat D1 (the linear-
+   EDMD ablation) -- reported as-is, not chased.
+7. K was NOT applied to real data in this phase (deferred to P8).
+
+Numbers behind the spectral diagnostics: D1 spectral radius=1.0000 (1
+eigenvalue "outside" the unit circle by the strict > check, but it is
+exactly the trivial constant->constant mode -- K's row 0 is
+[1, 0, 0, 0, 0, 0, 0] to ~1e-16, and its eigenvalue is 1.0+0j to floating-
+point precision, not a genuine instability). D2 spectral radius=1.0138, 5
+eigenvalues outside the unit circle (mix of the trivial mode and possibly-
+real mild instabilities -- worth a closer look in P7's eigenmode work, not
+resolved here). D3 spectral radius=1.0004, 3 outside (fewer than D2,
+consistent with D3's restricted/regularized structure).
+
+Bug caught by writing tests, fixed in source: lambda_selection_criterion
+hardcoded config.N_WEEKS instead of deriving n_weeks from the features
+array's own shape. Real data always has exactly 17 weeks, so the
+orchestrator's actual run was unaffected, but this was a latent
+correctness bug (an implicit, unchecked coupling to a global constant)
+that a synthetic-shape test caught immediately. Fixed to use
+features.shape[1]; re-ran the full P6 build afterward and confirmed
+bit-identical results on the real data (as expected, since the fix only
+changes behavior for non-17-week inputs).
+
+16 new tests (tests/test_edmd.py, test_build_edmd.py) including all 7
+tests required by this phase (D1 exact linear recovery, D2 exact
+quadratic recovery, closed-form ridge agreement, selector correctness,
+train-only scaler, no cross-trajectory pairs, unpenalized-constant shift
+invariance), plus the D3 rank confirmation on real data. 128 tests total,
+all passing.

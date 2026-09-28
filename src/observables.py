@@ -23,6 +23,16 @@ training split only, not here.
 Dimension-agnostic: works for n=6 (all, default) or n=5 (patients-only,
 deferred to experiment E6) -- callers pass group_names explicitly rather
 than anything being hardcoded to 6.
+
+D3 CAVEAT (confirmed analytically and empirically in P6, see
+research_log.md): for a fixed W, D3 adds NO new function space beyond D2.
+Wx is linear in x, so it's already in D1's span (0 new rank, given W is
+invertible here); x*(Wx) is a fixed linear combination of D2's own square
+and cross terms. D3's effective rank is <= 19 of its 25 raw features
+(confirmed: the fitted K has rank exactly 19). D3 is D2 restricted to a
+network-structured subspace -- describe it as "testing whether a
+contact-structured prior helps generalization", never as "injecting
+network information".
 """
 import numpy as np
 

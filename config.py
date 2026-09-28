@@ -42,3 +42,8 @@ TRAJECTORY_PARAM_MULTIPLIER_RANGE = (0.5, 2.0)  # beta, gamma varied around cali
 ENDEMIC_PREVALENCE_MULTIPLIER_RANGE = (0.5, 1.5)  # applied to each group's real prevalence
 
 DEFAULT_SIMULATION_POPULATION = "all"  # "all" (589, 6 groups) or "patients_only" (329, 5 wards; deferred to E6)
+
+# --- P6: EDMD fit ---
+EDMD_LAMBDA_GRID = list(np.geomspace(1e-6, 1e3, 20))
+EDMD_MAX_HORIZON = 4  # lambda selected on mean RMSE over h=1..4, not just h=1
+EDMD_DICTIONARIES = ["D1", "D2", "D3"]
