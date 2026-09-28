@@ -6,12 +6,12 @@ import config
 from src.load import load_admission, load_contacts, load_microbio
 from src.audit import (
     id_overlap_report,
-    map_to_ward_group,
     missing_contact_days_report,
     people_counts_report,
     reciprocity_report,
     reference_number_checks,
 )
+from src.wards import map_to_ward_group
 
 
 def _load_all():

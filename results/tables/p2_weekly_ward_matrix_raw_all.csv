@@ -1,0 +1,613 @@
+week,ward_from,ward_to,seconds
+0,Menard 1,Menard 1,6568770
+0,Menard 1,Menard 2,710220
+0,Menard 1,Sorrel 0,440460
+0,Menard 1,Sorrel 1,923910
+0,Menard 1,Sorrel 2,5820
+0,Menard 1,Other,290100
+0,Menard 2,Menard 1,710040
+0,Menard 2,Menard 2,3602550
+0,Menard 2,Sorrel 0,267420
+0,Menard 2,Sorrel 1,333390
+0,Menard 2,Sorrel 2,15510
+0,Menard 2,Other,131370
+0,Sorrel 0,Menard 1,440370
+0,Sorrel 0,Menard 2,267630
+0,Sorrel 0,Sorrel 0,1924410
+0,Sorrel 0,Sorrel 1,1285140
+0,Sorrel 0,Sorrel 2,102390
+0,Sorrel 0,Other,470370
+0,Sorrel 1,Menard 1,926100
+0,Sorrel 1,Menard 2,332670
+0,Sorrel 1,Sorrel 0,1291950
+0,Sorrel 1,Sorrel 1,3982290
+0,Sorrel 1,Sorrel 2,62760
+0,Sorrel 1,Other,703620
+0,Sorrel 2,Menard 1,5820
+0,Sorrel 2,Menard 2,15450
+0,Sorrel 2,Sorrel 0,102810
+0,Sorrel 2,Sorrel 1,62760
+0,Sorrel 2,Sorrel 2,3747870
+0,Sorrel 2,Other,103320
+0,Other,Menard 1,290220
+0,Other,Menard 2,131940
+0,Other,Sorrel 0,474240
+0,Other,Sorrel 1,702360
+0,Other,Sorrel 2,102780
+0,Other,Other,632550
+1,Menard 1,Menard 1,10209570
+1,Menard 1,Menard 2,25890
+1,Menard 1,Sorrel 0,11220
+1,Menard 1,Sorrel 1,135540
+1,Menard 1,Sorrel 2,1950
+1,Menard 1,Other,158130
+1,Menard 2,Menard 1,25890
+1,Menard 2,Menard 2,5597940
+1,Menard 2,Sorrel 0,3330
+1,Menard 2,Sorrel 1,21210
+1,Menard 2,Sorrel 2,2340
+1,Menard 2,Other,67800
+1,Sorrel 0,Menard 1,11370
+1,Sorrel 0,Menard 2,2880
+1,Sorrel 0,Sorrel 0,968250
+1,Sorrel 0,Sorrel 1,13860
+1,Sorrel 0,Sorrel 2,9750
+1,Sorrel 0,Other,27450
+1,Sorrel 1,Menard 1,135720
+1,Sorrel 1,Menard 2,21000
+1,Sorrel 1,Sorrel 0,13710
+1,Sorrel 1,Sorrel 1,4836780
+1,Sorrel 1,Sorrel 2,2070
+1,Sorrel 1,Other,189540
+1,Sorrel 2,Menard 1,1950
+1,Sorrel 2,Menard 2,2340
+1,Sorrel 2,Sorrel 0,9840
+1,Sorrel 2,Sorrel 1,2130
+1,Sorrel 2,Sorrel 2,2460960
+1,Sorrel 2,Other,42360
+1,Other,Menard 1,158910
+1,Other,Menard 2,67740
+1,Other,Sorrel 0,27060
+1,Other,Sorrel 1,191220
+1,Other,Sorrel 2,42630
+1,Other,Other,601830
+2,Menard 1,Menard 1,2854410
+2,Menard 1,Menard 2,19500
+2,Menard 1,Sorrel 0,150
+2,Menard 1,Sorrel 1,171870
+2,Menard 1,Sorrel 2,6330
+2,Menard 1,Other,90360
+2,Menard 2,Menard 1,21210
+2,Menard 2,Menard 2,2343000
+2,Menard 2,Sorrel 0,210
+2,Menard 2,Sorrel 1,600
+2,Menard 2,Sorrel 2,3420
+2,Menard 2,Other,59370
+2,Sorrel 0,Menard 1,150
+2,Sorrel 0,Menard 2,210
+2,Sorrel 0,Sorrel 0,103740
+2,Sorrel 0,Sorrel 1,1920
+2,Sorrel 0,Sorrel 2,750
+2,Sorrel 0,Other,14640
+2,Sorrel 1,Menard 1,171870
+2,Sorrel 1,Menard 2,600
+2,Sorrel 1,Sorrel 0,1920
+2,Sorrel 1,Sorrel 1,2083140
+2,Sorrel 1,Sorrel 2,2970
+2,Sorrel 1,Other,180870
+2,Sorrel 2,Menard 1,6420
+2,Sorrel 2,Menard 2,3420
+2,Sorrel 2,Sorrel 0,660
+2,Sorrel 2,Sorrel 1,2970
+2,Sorrel 2,Sorrel 2,692970
+2,Sorrel 2,Other,10590
+2,Other,Menard 1,90630
+2,Other,Menard 2,59130
+2,Other,Sorrel 0,14610
+2,Other,Sorrel 1,182070
+2,Other,Sorrel 2,10380
+2,Other,Other,498600
+3,Menard 1,Menard 1,20093490
+3,Menard 1,Menard 2,44640
+3,Menard 1,Sorrel 0,8970
+3,Menard 1,Sorrel 1,130560
+3,Menard 1,Sorrel 2,32190
+3,Menard 1,Other,69210
+3,Menard 2,Menard 1,43350
+3,Menard 2,Menard 2,5824260
+3,Menard 2,Sorrel 0,14460
+3,Menard 2,Sorrel 1,4350
+3,Menard 2,Sorrel 2,1020
+3,Menard 2,Other,129420
+3,Sorrel 0,Menard 1,8940
+3,Sorrel 0,Menard 2,14610
+3,Sorrel 0,Sorrel 0,2860380
+3,Sorrel 0,Sorrel 1,85830
+3,Sorrel 0,Sorrel 2,350760
+3,Sorrel 0,Other,58200
+3,Sorrel 1,Menard 1,130560
+3,Sorrel 1,Menard 2,4350
+3,Sorrel 1,Sorrel 0,85890
+3,Sorrel 1,Sorrel 1,6079170
+3,Sorrel 1,Sorrel 2,4140
+3,Sorrel 1,Other,149790
+3,Sorrel 2,Menard 1,32100
+3,Sorrel 2,Menard 2,1020
+3,Sorrel 2,Sorrel 0,350040
+3,Sorrel 2,Sorrel 1,4140
+3,Sorrel 2,Sorrel 2,2906790
+3,Sorrel 2,Other,75120
+3,Other,Menard 1,69570
+3,Other,Menard 2,129840
+3,Other,Sorrel 0,58650
+3,Other,Sorrel 1,150780
+3,Other,Sorrel 2,74400
+3,Other,Other,729990
+4,Menard 1,Menard 1,15029850
+4,Menard 1,Menard 2,83880
+4,Menard 1,Sorrel 0,12480
+4,Menard 1,Sorrel 1,56790
+4,Menard 1,Sorrel 2,1560
+4,Menard 1,Other,80850
+4,Menard 2,Menard 1,84600
+4,Menard 2,Menard 2,6523110
+4,Menard 2,Sorrel 0,19170
+4,Menard 2,Sorrel 1,4770
+4,Menard 2,Sorrel 2,3450
+4,Menard 2,Other,158850
+4,Sorrel 0,Menard 1,12540
+4,Sorrel 0,Menard 2,19380
+4,Sorrel 0,Sorrel 0,2390340
+4,Sorrel 0,Sorrel 1,20850
+4,Sorrel 0,Sorrel 2,10020
+4,Sorrel 0,Other,76830
+4,Sorrel 1,Menard 1,56190
+4,Sorrel 1,Menard 2,4860
+4,Sorrel 1,Sorrel 0,20910
+4,Sorrel 1,Sorrel 1,8054070
+4,Sorrel 1,Sorrel 2,4380
+4,Sorrel 1,Other,94530
+4,Sorrel 2,Menard 1,1560
+4,Sorrel 2,Menard 2,3450
+4,Sorrel 2,Sorrel 0,10020
+4,Sorrel 2,Sorrel 1,4380
+4,Sorrel 2,Sorrel 2,3686430
+4,Sorrel 2,Other,91500
+4,Other,Menard 1,80820
+4,Other,Menard 2,160380
+4,Other,Sorrel 0,76260
+4,Other,Sorrel 1,95040
+4,Other,Sorrel 2,90690
+4,Other,Other,1316760
+5,Menard 1,Menard 1,26055540
+5,Menard 1,Menard 2,284010
+5,Menard 1,Sorrel 0,390510
+5,Menard 1,Sorrel 1,365220
+5,Menard 1,Sorrel 2,6090
+5,Menard 1,Other,192360
+5,Menard 2,Menard 1,286050
+5,Menard 2,Menard 2,8661510
+5,Menard 2,Sorrel 0,63870
+5,Menard 2,Sorrel 1,14610
+5,Menard 2,Sorrel 2,9270
+5,Menard 2,Other,172440
+5,Sorrel 0,Menard 1,388920
+5,Sorrel 0,Menard 2,63690
+5,Sorrel 0,Sorrel 0,2453220
+5,Sorrel 0,Sorrel 1,448260
+5,Sorrel 0,Sorrel 2,27390
+5,Sorrel 0,Other,141750
+5,Sorrel 1,Menard 1,364230
+5,Sorrel 1,Menard 2,14610
+5,Sorrel 1,Sorrel 0,445020
+5,Sorrel 1,Sorrel 1,8761830
+5,Sorrel 1,Sorrel 2,7350
+5,Sorrel 1,Other,147750
+5,Sorrel 2,Menard 1,6000
+5,Sorrel 2,Menard 2,9270
+5,Sorrel 2,Sorrel 0,27630
+5,Sorrel 2,Sorrel 1,7230
+5,Sorrel 2,Sorrel 2,7933800
+5,Sorrel 2,Other,112950
+5,Other,Menard 1,192360
+5,Other,Menard 2,172260
+5,Other,Sorrel 0,142140
+5,Other,Sorrel 1,147930
+5,Other,Sorrel 2,111450
+5,Other,Other,679770
+6,Menard 1,Menard 1,26898630
+6,Menard 1,Menard 2,161010
+6,Menard 1,Sorrel 0,2790
+6,Menard 1,Sorrel 1,152130
+6,Menard 1,Sorrel 2,2700
+6,Menard 1,Other,113490
+6,Menard 2,Menard 1,162000
+6,Menard 2,Menard 2,7227720
+6,Menard 2,Sorrel 0,1350
+6,Menard 2,Sorrel 1,4500
+6,Menard 2,Sorrel 2,180
+6,Menard 2,Other,69480
+6,Sorrel 0,Menard 1,2790
+6,Sorrel 0,Menard 2,1350
+6,Sorrel 0,Sorrel 0,1957350
+6,Sorrel 0,Sorrel 1,130320
+6,Sorrel 0,Sorrel 2,61320
+6,Sorrel 0,Other,43440
+6,Sorrel 1,Menard 1,152130
+6,Sorrel 1,Menard 2,4740
+6,Sorrel 1,Sorrel 0,129870
+6,Sorrel 1,Sorrel 1,5463330
+6,Sorrel 1,Sorrel 2,12780
+6,Sorrel 1,Other,62790
+6,Sorrel 2,Menard 1,2730
+6,Sorrel 2,Menard 2,180
+6,Sorrel 2,Sorrel 0,61410
+6,Sorrel 2,Sorrel 1,12840
+6,Sorrel 2,Sorrel 2,5658120
+6,Sorrel 2,Other,63270
+6,Other,Menard 1,114390
+6,Other,Menard 2,69300
+6,Other,Sorrel 0,43710
+6,Other,Sorrel 1,62730
+6,Other,Sorrel 2,62760
+6,Other,Other,385110
+7,Menard 1,Menard 1,14903850
+7,Menard 1,Menard 2,177060
+7,Menard 1,Sorrel 0,450
+7,Menard 1,Sorrel 1,263460
+7,Menard 1,Sorrel 2,390
+7,Menard 1,Other,86340
+7,Menard 2,Menard 1,176580
+7,Menard 2,Menard 2,5527620
+7,Menard 2,Sorrel 0,1500
+7,Menard 2,Sorrel 1,4380
+7,Menard 2,Sorrel 2,1620
+7,Menard 2,Other,102510
+7,Sorrel 0,Menard 1,450
+7,Sorrel 0,Menard 2,1440
+7,Sorrel 0,Sorrel 0,1125330
+7,Sorrel 0,Sorrel 1,222240
+7,Sorrel 0,Sorrel 2,7830
+7,Sorrel 0,Other,30750
+7,Sorrel 1,Menard 1,263460
+7,Sorrel 1,Menard 2,4320
+7,Sorrel 1,Sorrel 0,219450
+7,Sorrel 1,Sorrel 1,2326830
+7,Sorrel 1,Sorrel 2,540
+7,Sorrel 1,Other,97260
+7,Sorrel 2,Menard 1,390
+7,Sorrel 2,Menard 2,1620
+7,Sorrel 2,Sorrel 0,7710
+7,Sorrel 2,Sorrel 1,540
+7,Sorrel 2,Sorrel 2,3988440
+7,Sorrel 2,Other,46050
+7,Other,Menard 1,86700
+7,Other,Menard 2,101910
+7,Other,Sorrel 0,30570
+7,Other,Sorrel 1,97380
+7,Other,Sorrel 2,46380
+7,Other,Other,557520
+8,Menard 1,Menard 1,6096060
+8,Menard 1,Menard 2,88350
+8,Menard 1,Sorrel 0,690
+8,Menard 1,Sorrel 1,66120
+8,Menard 1,Sorrel 2,330
+8,Menard 1,Other,30900
+8,Menard 2,Menard 1,87180
+8,Menard 2,Menard 2,1499340
+8,Menard 2,Sorrel 0,510
+8,Menard 2,Sorrel 1,330
+8,Menard 2,Sorrel 2,990
+8,Menard 2,Other,19080
+8,Sorrel 0,Menard 1,690
+8,Sorrel 0,Menard 2,510
+8,Sorrel 0,Sorrel 0,76020
+8,Sorrel 0,Sorrel 1,4950
+8,Sorrel 0,Sorrel 2,0
+8,Sorrel 0,Other,4500
+8,Sorrel 1,Menard 1,66120
+8,Sorrel 1,Menard 2,330
+8,Sorrel 1,Sorrel 0,4890
+8,Sorrel 1,Sorrel 1,703590
+8,Sorrel 1,Sorrel 2,180
+8,Sorrel 1,Other,7170
+8,Sorrel 2,Menard 1,330
+8,Sorrel 2,Menard 2,990
+8,Sorrel 2,Sorrel 0,0
+8,Sorrel 2,Sorrel 1,180
+8,Sorrel 2,Sorrel 2,734580
+8,Sorrel 2,Other,8670
+8,Other,Menard 1,30720
+8,Other,Menard 2,19260
+8,Other,Sorrel 0,4380
+8,Other,Sorrel 1,6990
+8,Other,Sorrel 2,8730
+8,Other,Other,229740
+9,Menard 1,Menard 1,24368130
+9,Menard 1,Menard 2,595410
+9,Menard 1,Sorrel 0,48450
+9,Menard 1,Sorrel 1,49500
+9,Menard 1,Sorrel 2,15090
+9,Menard 1,Other,122250
+9,Menard 2,Menard 1,599070
+9,Menard 2,Menard 2,9831330
+9,Menard 2,Sorrel 0,6750
+9,Menard 2,Sorrel 1,8040
+9,Menard 2,Sorrel 2,25920
+9,Menard 2,Other,116040
+9,Sorrel 0,Menard 1,48450
+9,Sorrel 0,Menard 2,6660
+9,Sorrel 0,Sorrel 0,958290
+9,Sorrel 0,Sorrel 1,2580
+9,Sorrel 0,Sorrel 2,79260
+9,Sorrel 0,Other,13470
+9,Sorrel 1,Menard 1,49470
+9,Sorrel 1,Menard 2,8010
+9,Sorrel 1,Sorrel 0,2580
+9,Sorrel 1,Sorrel 1,5988540
+9,Sorrel 1,Sorrel 2,2040
+9,Sorrel 1,Other,49440
+9,Sorrel 2,Menard 1,14610
+9,Sorrel 2,Menard 2,25920
+9,Sorrel 2,Sorrel 0,79410
+9,Sorrel 2,Sorrel 1,1890
+9,Sorrel 2,Sorrel 2,4685280
+9,Sorrel 2,Other,40050
+9,Other,Menard 1,122370
+9,Other,Menard 2,116250
+9,Other,Sorrel 0,13650
+9,Other,Sorrel 1,50100
+9,Other,Sorrel 2,40050
+9,Other,Other,308700
+10,Menard 1,Menard 1,18386250
+10,Menard 1,Menard 2,716580
+10,Menard 1,Sorrel 0,40500
+10,Menard 1,Sorrel 1,9600
+10,Menard 1,Sorrel 2,3570
+10,Menard 1,Other,76050
+10,Menard 2,Menard 1,757140
+10,Menard 2,Menard 2,8744940
+10,Menard 2,Sorrel 0,15780
+10,Menard 2,Sorrel 1,2130
+10,Menard 2,Sorrel 2,1500
+10,Menard 2,Other,124170
+10,Sorrel 0,Menard 1,40200
+10,Sorrel 0,Menard 2,15930
+10,Sorrel 0,Sorrel 0,1487070
+10,Sorrel 0,Sorrel 1,14490
+10,Sorrel 0,Sorrel 2,165480
+10,Sorrel 0,Other,40050
+10,Sorrel 1,Menard 1,9540
+10,Sorrel 1,Menard 2,2250
+10,Sorrel 1,Sorrel 0,14310
+10,Sorrel 1,Sorrel 1,6033360
+10,Sorrel 1,Sorrel 2,56340
+10,Sorrel 1,Other,30120
+10,Sorrel 2,Menard 1,3570
+10,Sorrel 2,Menard 2,1500
+10,Sorrel 2,Sorrel 0,163920
+10,Sorrel 2,Sorrel 1,56340
+10,Sorrel 2,Sorrel 2,7154460
+10,Sorrel 2,Other,78990
+10,Other,Menard 1,76260
+10,Other,Menard 2,123450
+10,Other,Sorrel 0,40020
+10,Other,Sorrel 1,29940
+10,Other,Sorrel 2,78240
+10,Other,Other,237720
+11,Menard 1,Menard 1,14975430
+11,Menard 1,Menard 2,136110
+11,Menard 1,Sorrel 0,44940
+11,Menard 1,Sorrel 1,38490
+11,Menard 1,Sorrel 2,30720
+11,Menard 1,Other,92520
+11,Menard 2,Menard 1,106650
+11,Menard 2,Menard 2,3910830
+11,Menard 2,Sorrel 0,1488930
+11,Menard 2,Sorrel 1,672240
+11,Menard 2,Sorrel 2,800610
+11,Menard 2,Other,393420
+11,Sorrel 0,Menard 1,45150
+11,Sorrel 0,Menard 2,1488060
+11,Sorrel 0,Sorrel 0,1780380
+11,Sorrel 0,Sorrel 1,1033620
+11,Sorrel 0,Sorrel 2,564810
+11,Sorrel 0,Other,762630
+11,Sorrel 1,Menard 1,38490
+11,Sorrel 1,Menard 2,673950
+11,Sorrel 1,Sorrel 0,1038420
+11,Sorrel 1,Sorrel 1,2765730
+11,Sorrel 1,Sorrel 2,129390
+11,Sorrel 1,Other,91800
+11,Sorrel 2,Menard 1,31320
+11,Sorrel 2,Menard 2,802590
+11,Sorrel 2,Sorrel 0,564240
+11,Sorrel 2,Sorrel 1,129930
+11,Sorrel 2,Sorrel 2,1973640
+11,Sorrel 2,Other,300960
+11,Other,Menard 1,92220
+11,Other,Menard 2,393450
+11,Other,Sorrel 0,763800
+11,Other,Sorrel 1,92070
+11,Other,Sorrel 2,302850
+11,Other,Other,464910
+12,Menard 1,Menard 1,18400680
+12,Menard 1,Menard 2,1020
+12,Menard 1,Sorrel 0,6180
+12,Menard 1,Sorrel 1,1290
+12,Menard 1,Sorrel 2,1980
+12,Menard 1,Other,141060
+12,Menard 2,Menard 1,1020
+12,Menard 2,Menard 2,8191200
+12,Menard 2,Sorrel 0,5160
+12,Menard 2,Sorrel 1,1440
+12,Menard 2,Sorrel 2,29880
+12,Menard 2,Other,90960
+12,Sorrel 0,Menard 1,6210
+12,Sorrel 0,Menard 2,5280
+12,Sorrel 0,Sorrel 0,1250070
+12,Sorrel 0,Sorrel 1,6060
+12,Sorrel 0,Sorrel 2,38910
+12,Sorrel 0,Other,51090
+12,Sorrel 1,Menard 1,1290
+12,Sorrel 1,Menard 2,1440
+12,Sorrel 1,Sorrel 0,6210
+12,Sorrel 1,Sorrel 1,3952350
+12,Sorrel 1,Sorrel 2,109650
+12,Sorrel 1,Other,23760
+12,Sorrel 2,Menard 1,1980
+12,Sorrel 2,Menard 2,29940
+12,Sorrel 2,Sorrel 0,38250
+12,Sorrel 2,Sorrel 1,109650
+12,Sorrel 2,Sorrel 2,5094150
+12,Sorrel 2,Other,112260
+12,Other,Menard 1,140520
+12,Other,Menard 2,90990
+12,Other,Sorrel 0,51990
+12,Other,Sorrel 1,23850
+12,Other,Sorrel 2,111480
+12,Other,Other,414870
+13,Menard 1,Menard 1,79050
+13,Menard 1,Menard 2,0
+13,Menard 1,Sorrel 0,0
+13,Menard 1,Sorrel 1,0
+13,Menard 1,Sorrel 2,0
+13,Menard 1,Other,810
+13,Menard 2,Menard 1,0
+13,Menard 2,Menard 2,4463340
+13,Menard 2,Sorrel 0,0
+13,Menard 2,Sorrel 1,4410
+13,Menard 2,Sorrel 2,60
+13,Menard 2,Other,7830
+13,Sorrel 0,Menard 1,0
+13,Sorrel 0,Menard 2,0
+13,Sorrel 0,Sorrel 0,786240
+13,Sorrel 0,Sorrel 1,1260
+13,Sorrel 0,Sorrel 2,35130
+13,Sorrel 0,Other,45600
+13,Sorrel 1,Menard 1,0
+13,Sorrel 1,Menard 2,4380
+13,Sorrel 1,Sorrel 0,1260
+13,Sorrel 1,Sorrel 1,1381440
+13,Sorrel 1,Sorrel 2,8970
+13,Sorrel 1,Other,3660
+13,Sorrel 2,Menard 1,0
+13,Sorrel 2,Menard 2,60
+13,Sorrel 2,Sorrel 0,35040
+13,Sorrel 2,Sorrel 1,8970
+13,Sorrel 2,Sorrel 2,3483150
+13,Sorrel 2,Other,6060
+13,Other,Menard 1,810
+13,Other,Menard 2,7830
+13,Other,Sorrel 0,45690
+13,Other,Sorrel 1,3750
+13,Other,Sorrel 2,6060
+13,Other,Other,166470
+14,Menard 1,Menard 1,0
+14,Menard 1,Menard 2,0
+14,Menard 1,Sorrel 0,0
+14,Menard 1,Sorrel 1,0
+14,Menard 1,Sorrel 2,0
+14,Menard 1,Other,0
+14,Menard 2,Menard 1,0
+14,Menard 2,Menard 2,1751880
+14,Menard 2,Sorrel 0,0
+14,Menard 2,Sorrel 1,0
+14,Menard 2,Sorrel 2,0
+14,Menard 2,Other,210
+14,Sorrel 0,Menard 1,0
+14,Sorrel 0,Menard 2,0
+14,Sorrel 0,Sorrel 0,272760
+14,Sorrel 0,Sorrel 1,0
+14,Sorrel 0,Sorrel 2,21600
+14,Sorrel 0,Other,0
+14,Sorrel 1,Menard 1,0
+14,Sorrel 1,Menard 2,0
+14,Sorrel 1,Sorrel 0,0
+14,Sorrel 1,Sorrel 1,7650
+14,Sorrel 1,Sorrel 2,0
+14,Sorrel 1,Other,0
+14,Sorrel 2,Menard 1,0
+14,Sorrel 2,Menard 2,0
+14,Sorrel 2,Sorrel 0,21480
+14,Sorrel 2,Sorrel 1,0
+14,Sorrel 2,Sorrel 2,2651610
+14,Sorrel 2,Other,3990
+14,Other,Menard 1,0
+14,Other,Menard 2,210
+14,Other,Sorrel 0,0
+14,Other,Sorrel 1,0
+14,Other,Sorrel 2,3900
+14,Other,Other,4320
+15,Menard 1,Menard 1,0
+15,Menard 1,Menard 2,0
+15,Menard 1,Sorrel 0,0
+15,Menard 1,Sorrel 1,0
+15,Menard 1,Sorrel 2,0
+15,Menard 1,Other,0
+15,Menard 2,Menard 1,0
+15,Menard 2,Menard 2,12600
+15,Menard 2,Sorrel 0,0
+15,Menard 2,Sorrel 1,0
+15,Menard 2,Sorrel 2,0
+15,Menard 2,Other,0
+15,Sorrel 0,Menard 1,0
+15,Sorrel 0,Menard 2,0
+15,Sorrel 0,Sorrel 0,167850
+15,Sorrel 0,Sorrel 1,0
+15,Sorrel 0,Sorrel 2,14580
+15,Sorrel 0,Other,480
+15,Sorrel 1,Menard 1,0
+15,Sorrel 1,Menard 2,0
+15,Sorrel 1,Sorrel 0,0
+15,Sorrel 1,Sorrel 1,0
+15,Sorrel 1,Sorrel 2,0
+15,Sorrel 1,Other,0
+15,Sorrel 2,Menard 1,0
+15,Sorrel 2,Menard 2,0
+15,Sorrel 2,Sorrel 0,14550
+15,Sorrel 2,Sorrel 1,0
+15,Sorrel 2,Sorrel 2,2423520
+15,Sorrel 2,Other,4980
+15,Other,Menard 1,0
+15,Other,Menard 2,0
+15,Other,Sorrel 0,480
+15,Other,Sorrel 1,0
+15,Other,Sorrel 2,4980
+15,Other,Other,21360
+16,Menard 1,Menard 1,0
+16,Menard 1,Menard 2,0
+16,Menard 1,Sorrel 0,0
+16,Menard 1,Sorrel 1,0
+16,Menard 1,Sorrel 2,0
+16,Menard 1,Other,0
+16,Menard 2,Menard 1,0
+16,Menard 2,Menard 2,0
+16,Menard 2,Sorrel 0,0
+16,Menard 2,Sorrel 1,0
+16,Menard 2,Sorrel 2,0
+16,Menard 2,Other,0
+16,Sorrel 0,Menard 1,0
+16,Sorrel 0,Menard 2,0
+16,Sorrel 0,Sorrel 0,0
+16,Sorrel 0,Sorrel 1,0
+16,Sorrel 0,Sorrel 2,0
+16,Sorrel 0,Other,0
+16,Sorrel 1,Menard 1,0
+16,Sorrel 1,Menard 2,0
+16,Sorrel 1,Sorrel 0,0
+16,Sorrel 1,Sorrel 1,0
+16,Sorrel 1,Sorrel 2,0
+16,Sorrel 1,Other,0
+16,Sorrel 2,Menard 1,0
+16,Sorrel 2,Menard 2,0
+16,Sorrel 2,Sorrel 0,0
+16,Sorrel 2,Sorrel 1,0
+16,Sorrel 2,Sorrel 2,368970
+16,Sorrel 2,Other,0
+16,Other,Menard 1,0
+16,Other,Menard 2,0
+16,Other,Sorrel 0,0
+16,Other,Sorrel 1,0
+16,Other,Sorrel 2,0
+16,Other,Other,0

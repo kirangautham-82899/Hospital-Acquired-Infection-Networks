@@ -167,7 +167,7 @@ def main():
     for d in missing_days:
         print(f"  {d}")
 
-    from src.audit import map_to_ward_group
+    from src.wards import map_to_ward_group
     import pandas as pd
     mic = microbio.copy()
     mic["ward_group"] = map_to_ward_group(mic["service_pa_pe"])

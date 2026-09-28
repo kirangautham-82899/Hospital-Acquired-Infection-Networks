@@ -9,27 +9,7 @@ import pandas as pd
 
 import config
 from src.load import load_admission, load_contacts, load_microbio
-
-
-def person_prefix(ident_series):
-    """Return 'PA', 'PE', or 'OTHER' for each calc_ident string, based on
-    its leading prefix (e.g. 'PA-001-LAM' -> 'PA')."""
-    prefix = ident_series.str.split("-").str[0]
-    return prefix.where(prefix.isin(["PA", "PE"]), "OTHER")
-
-
-def map_to_ward_group(service_series):
-    """Map a raw service_pa_pe value to one of the 6 locked ward groups:
-    the 5 real wards pass through unchanged, the 4 staff-only services
-    collapse to 'Other', and anything else comes back as 'UNMAPPED' so the
-    audit can flag it instead of silently misclassifying people."""
-    def _map(value):
-        if value in config.OTHER_SERVICES:
-            return "Other"
-        if value in [g for g in config.WARD_GROUPS if g != "Other"]:
-            return value
-        return "UNMAPPED"
-    return service_series.map(_map)
+from src.wards import map_to_ward_group, person_prefix
 
 
 def shapes_report(admission, contacts, microbio):

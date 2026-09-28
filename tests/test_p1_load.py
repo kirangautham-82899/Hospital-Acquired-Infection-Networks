@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 import config
-from src.audit import map_to_ward_group, person_prefix
+from src.wards import map_to_ward_group, person_prefix
 from src.load import load_admission, load_contacts, load_microbio
 
 
