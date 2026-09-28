@@ -1,0 +1,5 @@
+week,group,prevalence,n_tested,n_positive,low_n
+0,Menard 2,0.42857142857142855,7,3,True
+0,Sorrel 0,0.0,5,0,True
+0,Sorrel 2,0.0,1,0,True
+6,Menard 2,0.0,7,0,True

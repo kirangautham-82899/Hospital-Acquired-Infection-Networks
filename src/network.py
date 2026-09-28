@@ -73,11 +73,25 @@ def filter_edges(edges, admission, include_staff=True):
     return edges[edges["u"].isin(allowed) & edges["v"].isin(allowed)]
 
 
-def assign_week(day_series, study_start=None):
-    """Map each day to a 0-indexed week number, where week 0 is the 7-day
-    bin starting at study_start (defaults to config.STUDY_START)."""
-    study_start = pd.Timestamp(study_start or config.STUDY_START)
-    return ((day_series - study_start).dt.days // 7).astype(int)
+def monday_on_or_before(date):
+    """Return the Monday on or before the given date."""
+    date = pd.Timestamp(date)
+    return date - pd.Timedelta(days=date.weekday())
+
+
+def assign_week(day_series, anchor=None):
+    """Map each day to a 0-indexed week number using Monday-anchored
+    weekly bins. Week 0 is the Monday-Sunday week containing/preceding
+    `anchor` (defaults to config.STUDY_START, 2009-07-01, a Wednesday).
+
+    This is Monday-anchored rather than anchored at STUDY_START itself
+    because microbio's swabs run Monday-Thursday: bins starting on a
+    Wednesday cut each ward's weekly screening round across two bins.
+    Verified on the Jul1-Oct25 window: Wed-anchored bins put 655 of 3,812
+    person-weeks (17.2%) into >1 bin per screening round, vs 80 of 4,412
+    (1.8%) with Monday-anchored bins. See research_log.md."""
+    monday_anchor = monday_on_or_before(anchor or config.STUDY_START)
+    return ((day_series - monday_anchor).dt.days // 7).astype(int)
 
 
 def build_graph(edges, nodes=None):
