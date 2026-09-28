@@ -851,3 +851,97 @@ scaled once, not twice" case), the single-ward function confirmed as a
 special case of the new general one, the random-wards runner's
 reproducibility and ward-choice variation, and top_k_wards. 172 tests
 total, all passing.
+
+Sep 28: P11 robustness experiments E1-E8 done (new src/robustness.py,
+src/build_p11.py). CLAUDE.md names this phase "robustness experiments
+E1-E8" but, unlike P1-P10, never defines what E1-E8 actually are -- no
+content to follow here, only a phase name. Designed all 8 myself (asked
+to proceed with my own judgment) and deliberately anchored every one to a
+specific finding or limitation THIS project already flagged in its own
+research_log.md, rather than inventing generic sensitivity checks:
+
+  E1 seed sensitivity            -- P9's ground truth used one base seed
+  E2 lambda sensitivity          -- P6 found a remarkably FLAT lambda curve
+  E3 replicate-count sensitivity -- P9/P10 used 100/200 replicates
+  E4 calibration ridge-point     -- P4 found gamma sits on a wide loss ridge
+  E5 W time-window               -- P5 flagged W spans the holdout period
+  E6 patients-only population    -- decision #3's sensitivity run, deferred
+                                     at every phase since P2 ("run later as
+                                     experiment E6" -- literally named E6
+                                     already, in P4's own log entry)
+  E7 missing-data handling       -- decision #6's carry-forward sensitivity
+                                     run, built in P3, unused for scoring
+                                     until now by design
+  E8 D3 structural redundancy    -- P6/P7 proved D3 subseteq span(D2)
+
+Every experiment reports a Spearman rho (rank-based checks) or an RMSE
+ratio (magnitude-based checks, E2/E8) between a baseline and a perturbed
+re-run, so "how robust is this" has one comparable answer format
+throughout instead of 8 different bespoke metrics.
+
+Design note on E3 specifically, caught before overstating the result:
+numpy's SeedSequence.spawn(n) assigns spawn keys 0..n-1 deterministically,
+so a 30-replicate run using the SAME default base seed as the original
+100-replicate baseline is an exact PREFIX of it, and a 300-replicate run
+extends it with 200 more -- this makes E3 a Monte Carlo CONVERGENCE check
+(does a smaller/larger sample of the SAME stream already agree with the
+full one), not an independent-reseeding check. E1 is the one that
+actually tests a fully independent reseed. Documented explicitly in
+e3_replicate_count_sensitivity's docstring so this distinction isn't lost
+later.
+
+RESULT: unusually clean and uniformly positive across all 8 -- every rank-
+based check returned rho=1.0 except E1 (seed sensitivity: rho=0.943,
+p=0.0048, matching P9's exact original Spearman rho for degree_centrality
+vs ground truth, a nice internal consistency check), and both magnitude-
+based checks stayed within 3.3% of baseline (E2: max |rmse_ratio-1| =
+0.033 across a 100x lambda range; E8: rmse_ratio=0.998). This is not
+treated as suspicious -- each check varies a genuinely different axis
+(seed, replicate count, calibration point, time window, population,
+imputation, lambda, dictionary structure), and the underlying reasons are
+independently explicable: the ward ranking is driven by a large, stable
+structural feature of the actual contact data (Menard 1's outsized
+contact volume, confirmed already in P2), not a fragile model artifact,
+so it is unsurprising that perturbing modeling CHOICES around that
+data leaves the ranking unchanged; and E8's near-zero effect is expected
+because D3's redundancy is an algebraic FACT proven in P6/P7 (Wx
+contributes literally zero rank given invertible W), not an empirical
+coincidence that could have gone the other way. E8 also independently
+re-confirms P6/P7's exact numbers from a different angle: D3_reduced (19
+features) fits a rank-19 K, identical to full D3's rank -- exactly as
+predicted, and its dominant mode picks the SAME ward (Sorrel 1) as full
+D3's.
+
+One genuine (if modest) finding of note: E1's rho=0.9428571428571... is
+the single weakest robustness result among all 8, and it matches P9's
+degree_centrality-vs-ground-truth correlation to 15 decimal places
+(0.942857142857143 in both p9_spearman_vs_ground_truth.csv and E1's
+output). Checked this rather than waving it off as either a bug or an
+uninteresting coincidence: for n=6, Spearman rho = 1 - sum(d_i^2)/35, a
+quantized statistic with few achievable values near 1; rho=0.942857...
+corresponds EXACTLY to sum(d_i^2)=2, which happens if and only if two
+rankings differ by exactly ONE adjacent-rank swap (transposing two
+neighboring ranks, everything else identical) -- the smallest possible
+non-zero perturbation for 6 items. Verified directly: E1's alt-seed
+ground-truth ranking differs from the original by exactly one adjacent
+swap (Sorrel 0 and Sorrel 2 trade ranks 4 and 5, every other ward
+identical), and P9's degree_centrality ranking differs from ground truth
+by its own, unrelated adjacent swap. The two rho values match not because
+the comparisons are connected, but because "exactly one adjacent-rank
+swap out of 6 items" is a common, specific near-agreement outcome that
+several genuinely different comparisons can independently land on -- a
+real property of small-n rank statistics (itself an instance of
+CLAUDE.md's "only 6 groups, rank statistics are weak" limitation) worth
+recording so a reader doesn't mistake the matching digits for a
+self-referential bug.
+
+Files: results/tables/p11_summary.csv (one row per experiment),
+p11_e2_lambda_detail.csv, p11_e7_model_ranking_detail.csv,
+p11_e8_detail.csv.
+
+7 new tests (tests/test_robustness.py): rank_stability's agreement/
+disagreement/reordering behavior, D3_reduced feature construction
+verified against full D3 (both single-sample and batched), and integration
+checks confirming the raw ingredients E4/E5 depend on (a genuine ridge
+with >1 near-best point; calibration-week contacts are a strict subset of
+the whole period). 179 tests total, all passing.

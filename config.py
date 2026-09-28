@@ -55,3 +55,13 @@ INTERVENTION_N_REPLICATES = 200  # common random numbers across every strategy/c
 INTERVENTION_TARGETED_STRATEGIES = ["random", "degree_targeted"] + [
     f"koopman_targeted_{d}" for d in EDMD_DICTIONARIES
 ]
+
+# --- P11: robustness experiments E1-E8 ---
+# CLAUDE.md names this phase "robustness experiments E1-E8" without
+# defining them -- unlike P1-P10's locked decisions. Designed here to
+# directly probe the soft spots this project has already flagged in its
+# own research_log.md / CLAUDE.md's known limitations, logged in full.
+ROBUSTNESS_N_REPLICATES = 100  # standard replicate count for E1, E4, E5, E6 (matches P9)
+ROBUSTNESS_ALT_SEED = 20261225  # E1: a different global seed
+ROBUSTNESS_REPLICATE_COUNTS = [30, 300]  # E3: vs P9's standard 100
+ROBUSTNESS_LAMBDA_MULTIPLIERS = [0.1, 10.0]  # E2: vs each dictionary's P6-selected lambda

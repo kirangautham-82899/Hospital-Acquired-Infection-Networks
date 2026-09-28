@@ -1,0 +1,10 @@
+experiment,description,stability_metric,value,detail
+E1,seed sensitivity (P9 ground truth),rho,0.942857142857143,"alt_seed=20261225, n_replicates=100"
+E2,"lambda sensitivity (P8 holdout RMSE, h=1)",max |rmse_ratio - 1|,0.032925627268426294,see p11_e2_lambda_detail.csv
+E3,replicate-count sensitivity (n=30),rho,1.0,n_replicates=30
+E3,replicate-count sensitivity (n=300),rho,1.0,n_replicates=300
+E4,calibration ridge-point sensitivity (P9 ground truth),rho,1.0,"alt beta=0.001395, gamma=0.005369, loss=0.005595"
+E5,W time-window sensitivity (degree centrality),rho,1.0,"degree centrality, whole-period W vs calibration-weeks-only W"
+E6,"patients-only population (P9 ground truth, 5 shared wards)",rho,0.9999999999999999,n_people=329
+E7,missing-data handling (P8 model ranking agreement),rho,1.0,see p11_e7_model_ranking_detail.csv
+E8,"D3 structural redundancy (holdout RMSE ratio, reduced/full)",rmse_ratio,0.9977452236154072,"dominant ward MATCHES: full=Sorrel 1, reduced=Sorrel 1"

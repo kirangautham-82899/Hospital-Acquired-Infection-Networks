@@ -1,0 +1,2 @@
+experiment,d3_full_n_features,d3_reduced_n_features,d3_full_rank_K,d3_reduced_rank_K,d3_full_holdout_rmse_h1,d3_reduced_holdout_rmse_h1,rmse_ratio,d3_full_dominant_ward,d3_reduced_dominant_ward,dominant_ward_matches
+E8_D3_structural_redundancy,25,19,19,19,0.0466468385417062,0.04654166035174644,0.9977452236154072,Sorrel 1,Sorrel 1,True
