@@ -226,8 +226,8 @@ def build():
             "P5 EDMD dictionaries (D1/D2/D3)  →  P6 Ridge-regularized EDMD fit",
             "P7 Eigenmodes + Koopman influence  →  P8 Real-data forecasting validation",
             "P9 Superspreader score vs. centrality  →  P10 Intervention simulation",
-            "P11 Robustness experiments E1–E8",
-            "194 automated tests; every decision and the Nov 14 review fixes logged",
+            "P11 Robustness experiments E1–E9 (E9: rerun P4–P10 along the calibration ridge)",
+            "196 automated tests; every decision and the Nov 14 review fixes logged",
         ],
     )
 
@@ -307,8 +307,8 @@ def build():
             ["D3", "+0.0008 [−0.0004, +0.0018]", "+0.0037 [+0.0009, +0.0054]", "+0.0058 [+0.0003, +0.0088]"],
             ["historical mean", "+0.0228 [+0.0110, +0.0384]", "−0.0173 [−0.0427, +0.0078]", "−0.0176 [−0.0402, +0.0037]"],
         ],
-        note="Holdout weeks 12–16, block-bootstrap 95% CIs (5 start weeks, rough). Positive = worse than persistence.\n"
-             "No EDMD variant beats persistence; at 3–4 weeks they are slightly but measurably worse.",
+        note="Main calibration point; block-bootstrap 95% CIs from only 5 start weeks (rough). Positive = worse.\n"
+             "Across all 5 calibration points (E9): tied at h=1 everywhere; at h=3–4 the sign flips with γ.",
     )
 
     add_section_slide(prs, "The Central Question:\nKoopman Scores vs. Simple Centrality")
@@ -337,8 +337,8 @@ def build():
             ["Koopman D1 mode share", "0.600 (p=0.24)", "−0.486 (p=0.36)"],
             ["Koopman D2 mode share", "−0.371 (p=0.50)", "−0.486 (p=0.36)"],
         ],
-        note="Degree wins A, largely by construction. Under B no candidate ranks the wards reliably (n=6).\n"
-             "Koopman scores also moved with the calibration point (old run: 0.26–0.54 vs A).",
+        note="Degree wins A (largely by construction) at all 5 calibration points; Koopman scores swing −0.77..0.83.\n"
+             "Under B no candidate ranks the wards reliably at any calibration point (n=6).",
     )
 
     add_image_slide(
@@ -346,17 +346,18 @@ def build():
         f"{FIG}/p10_drop_vs_budget.png",
         bullets=[
             "Equal budget = k × reduction; 200 paired replicates, 95% CIs",
-            "Degree-targeted beats random AND whole-hospital at every budget",
+            "Degree-targeted beats random AND whole-hospital at every budget "
+            "and every calibration point",
             "Koopman D2 mode-share targeting is WORSE than random",
-            "Koopman D3 beats degree in 1 of 48 comparisons "
-            "(k=2, 75%: +31 person-days, CI 7–55); ties otherwise",
+            "Koopman beats degree in 1 of 60 comparisons across all "
+            "calibration points (E9); loses 26, ties 33",
             "Best strategy prevents < 5% of colonized person-days",
         ],
         caption="Figure: drop vs. budget, one panel per k, 95% paired CIs. Degree and influence D1/D3 pick the same wards, so their lines overlap.",
     )
 
     add_table_slide(
-        prs, "Robustness: Experiments E1–E8 (P11)",
+        prs, "Robustness: Experiments E1–E9 (P11)",
         ["#", "Probes", "Result"],
         [
             ["E1", "Seed sensitivity (ground truth A)", "ρ=0.943"],
@@ -367,9 +368,29 @@ def build():
             ["E6", "Patients-only population", "ρ=1.000"],
             ["E7", "Missing-data handling", "ρ=0.50 (3 near-tied models)"],
             ["E8", "D3 structural redundancy", "ratio 0.999, dominant ward DIFFERS"],
+            ["E9", "Whole pipeline at 5 calibration points", "see next slides"],
         ],
         note="Ground truth A's ranking is very stable (driven by Menard 1's contact volume).\n"
              "Koopman eigenmode ward shares are fragile (E8).",
+    )
+
+    add_image_slide(
+        prs, "E9: What Holds Across the Calibration Ridge",
+        f"{FIG}/p11_e9_ridge_sensitivity.png",
+        caption="Rerun of P4–P10 at all 5 γ values within 5% of the best calibration loss.",
+    )
+
+    add_table_slide(
+        prs, "E9 Summary: Robust vs. Fragile Conclusions",
+        ["Claim", "Range over 5 points", "Holds everywhere?"],
+        [
+            ["EDMD ≈ persistence at h=1", "−0.0003 .. +0.0009", "yes"],
+            ["EDMD vs persistence at h=3–4", "−0.0023 .. +0.0064", "no (sign flips)"],
+            ["ρ(degree, ground truth A)", "0.943 .. 0.943", "yes"],
+            ["ρ(Koopman D3 mode, A)", "−0.771 .. 0.829", "no"],
+            ["Degree beats random / whole-hospital", "20 of 20", "yes"],
+            ["Koopman beats degree", "1 of 60", "never reliably"],
+        ],
     )
 
     add_bullet_slide(
@@ -380,7 +401,8 @@ def build():
             "drifts up while real prevalence fell; EDMD inherits that drift",
             "Ranking: ground truth A mostly measures contact volume; under "
             "equal hours nothing ranks reliably with 6 wards",
-            "Koopman scores depend on an unidentified decolonization rate",
+            "Koopman scores depend on an unidentified decolonization rate "
+            "(E9: they swing −0.77..0.83; degree does not move)",
             "Practical: concentrate contact reduction on the busiest wards — "
             "beats random/whole-hospital, but the gain is small (< 5%)",
         ],

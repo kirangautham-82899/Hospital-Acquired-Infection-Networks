@@ -8,3 +8,16 @@ E5,W time-window sensitivity (degree centrality),rho,1.0,"degree centrality, who
 E6,"patients-only population (P9 ground truth, 5 shared wards)",rho,0.9999999999999999,n_people=329
 E7,missing-data handling (P8 model ranking agreement),rho,0.5,see p11_e7_model_ranking_detail.csv
 E8,"D3 structural redundancy (holdout RMSE ratio, reduced/full)",rmse_ratio,0.9990249093994672,"dominant ward DIFFERS: full=Menard 1, reduced=Sorrel 2"
+E9,ridge: EDMD spectral radius (all dictionaries),min..max,1.0231025835028915,1.0000..1.0231; 5 gamma points 0.0001..0.00215
+E9,"ridge: real holdout RMSE - persistence, h=1",max,0.0009047567961414024,"-0.0003..+0.0009; CI excludes 0 worse in 0, better in 0 of 15"
+E9,"ridge: real holdout RMSE - persistence, h=2",max,0.001356021042854011,"-0.0021..+0.0014; CI excludes 0 worse in 0, better in 2 of 15"
+E9,"ridge: real holdout RMSE - persistence, h=3",max,0.004157865309591613,"-0.0023..+0.0042; CI excludes 0 worse in 6, better in 2 of 15"
+E9,"ridge: real holdout RMSE - persistence, h=4",max,0.006430015754365637,"-0.0011..+0.0064; CI excludes 0 worse in 5, better in 0 of 15"
+E9,ridge: Spearman degree_centrality vs pct50,min,0.942857142857143,0.943..0.943
+E9,ridge: Spearman koopman_D3 vs pct50,min,-0.7714285714285715,-0.771..0.829
+E9,ridge: Spearman koopman_influence_D3 vs pct50,min,0.2571428571428572,0.257..0.829
+E9,ridge: Spearman degree_centrality vs equal_hours,min,-0.08571428571428573,-0.086..0.257
+E9,ridge: Spearman koopman_D3 vs equal_hours,min,-0.48571428571428577,-0.486..0.314
+E9,ridge: Spearman koopman_influence_D3 vs equal_hours,min,-0.48571428571428577,-0.486..0.371
+E9,ridge: degree-targeted vs random/whole-hospital,share better,1.0,20 of 20 comparisons better
+E9,ridge: Koopman-targeted vs degree-targeted,share better,0.016666666666666666,"better 1, worse 26, tied 33 of 60"

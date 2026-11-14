@@ -1,4 +1,4 @@
-"""P11 orchestrator: run robustness experiments E1-E8 (see
+"""P11 orchestrator: run robustness experiments E1-E9 (see
 src/robustness.py's module docstring for what each one probes and why)
 and assemble a single summary table.
 
@@ -7,6 +7,12 @@ Writes:
   results/tables/p11_e2_lambda_detail.csv
   results/tables/p11_e7_model_ranking_detail.csv
   results/tables/p11_e8_detail.csv
+  results/tables/p11_e9_ridge_points.csv     (E9: every near-optimal calibration point, src/ridge_sensitivity.py)
+  results/tables/p11_e9_models.csv           (E9: lambda, spectral radius, sim-test skill per point x dictionary)
+  results/tables/p11_e9_forecast.csv         (E9: real holdout RMSE minus persistence, block-bootstrap CI)
+  results/tables/p11_e9_ranking.csv          (E9: Spearman of every score vs both ground truths)
+  results/tables/p11_e9_interventions.csv    (E9: paired advantages in two P10 cells)
+  results/figures/p11_e9_ridge_sensitivity.png
 """
 import pandas as pd
 
@@ -22,12 +28,13 @@ from src.robustness import (
     e7_missing_data_handling,
     e8_d3_structural_redundancy,
 )
+from src.ridge_sensitivity import e9_calibration_ridge
 
 
 def build():
     config.RESULTS_TABLES_DIR.mkdir(parents=True, exist_ok=True)
 
-    print("P11 ROBUSTNESS EXPERIMENTS E1-E8")
+    print("P11 ROBUSTNESS EXPERIMENTS E1-E9")
     print("=" * 60)
 
     setup = build_common_setup()
@@ -102,6 +109,16 @@ def build():
                     f"full={e8['d3_full_dominant_ward']}, reduced={e8['d3_reduced_dominant_ward']}"}
     )
 
+    print("\n[E9] calibration ridge: rerun P4-P10 at every near-optimal gamma...")
+    points, e9 = e9_calibration_ridge(setup)
+    points.to_csv(config.RESULTS_TABLES_DIR / "p11_e9_ridge_points.csv", index=False)
+    e9["params"].to_csv(config.RESULTS_TABLES_DIR / "p11_e9_models.csv", index=False)
+    e9["forecast"].to_csv(config.RESULTS_TABLES_DIR / "p11_e9_forecast.csv", index=False)
+    e9["ranking"].to_csv(config.RESULTS_TABLES_DIR / "p11_e9_ranking.csv", index=False)
+    e9["interventions"].to_csv(config.RESULTS_TABLES_DIR / "p11_e9_interventions.csv", index=False)
+    summary_rows.extend(e9_summary_rows(points, e9))
+    _e9_plot(e9)
+
     summary = pd.DataFrame(summary_rows)
     summary.to_csv(config.RESULTS_TABLES_DIR / "p11_summary.csv", index=False)
 
@@ -110,6 +127,81 @@ def build():
     print(summary[["experiment", "description", "stability_metric", "value"]].to_string(index=False))
 
     return summary
+
+
+def e9_summary_rows(points, e9):
+    """One summary row per E9 question, each giving the range over ridge
+    points (min..max) so the reader sees how much the answer moves."""
+    rows = []
+    g_lo, g_hi = points["gamma"].min(), points["gamma"].max()
+    span = f"{len(points)} gamma points {g_lo:.3g}..{g_hi:.3g}"
+    m = e9["params"]
+    rows.append({"experiment": "E9", "description": "ridge: EDMD spectral radius (all dictionaries)",
+                 "stability_metric": "min..max", "value": m["spectral_radius"].max(),
+                 "detail": f"{m['spectral_radius'].min():.4f}..{m['spectral_radius'].max():.4f}; {span}"})
+    f = e9["forecast"]
+    for h in sorted(f["h"].unique()):
+        sub = f[f["h"] == h]
+        n_worse = int((sub["ci_low"] > 0).sum())
+        n_better = int((sub["ci_high"] < 0).sum())
+        rows.append({"experiment": "E9", "description": f"ridge: real holdout RMSE - persistence, h={h}",
+                     "stability_metric": "max", "value": sub["rmse_diff"].max(),
+                     "detail": f"{sub['rmse_diff'].min():+.4f}..{sub['rmse_diff'].max():+.4f}; "
+                               f"CI excludes 0 worse in {n_worse}, better in {n_better} of {len(sub)}"})
+    r = e9["ranking"]
+    for gt in ["pct50", "equal_hours"]:
+        for cand in ["degree_centrality", "koopman_D3", "koopman_influence_D3"]:
+            sub = r[(r["ground_truth"] == gt) & (r["candidate"] == cand)]
+            rows.append({"experiment": "E9", "description": f"ridge: Spearman {cand} vs {gt}",
+                         "stability_metric": "min", "value": sub["spearman_rho"].min(),
+                         "detail": f"{sub['spearman_rho'].min():.3f}..{sub['spearman_rho'].max():.3f}"})
+    iv = e9["interventions"]
+    deg = iv[(iv["strategy"] == "degree_centrality") & iv["reference"].isin(["random", "whole_hospital"])]
+    rows.append({"experiment": "E9", "description": "ridge: degree-targeted vs random/whole-hospital",
+                 "stability_metric": "share better", "value": float((deg["verdict"] == "better").mean()),
+                 "detail": f"{int((deg['verdict'] == 'better').sum())} of {len(deg)} comparisons better"})
+    kd = iv[iv["reference"] == "degree_centrality"]
+    rows.append({"experiment": "E9", "description": "ridge: Koopman-targeted vs degree-targeted",
+                 "stability_metric": "share better", "value": float((kd["verdict"] == "better").mean()),
+                 "detail": f"better {int((kd['verdict'] == 'better').sum())}, worse "
+                           f"{int((kd['verdict'] == 'worse').sum())}, tied {int((kd['verdict'] == 'not distinguishable').sum())}"
+                           f" of {len(kd)}"})
+    return rows
+
+
+def _e9_plot(e9):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
+    f = e9["forecast"]
+    for name, g in f[f["h"] == 4].groupby("model"):
+        g = g.sort_values("gamma")
+        axes[0].errorbar(g["gamma"], g["rmse_diff"], yerr=[g["rmse_diff"] - g["ci_low"], g["ci_high"] - g["rmse_diff"]],
+                         marker="o", capsize=3, label=name)
+    axes[0].axhline(0, color="gray", linestyle=":")
+    axes[0].set_title("real holdout RMSE - persistence, h=4\n(> 0 = worse than persistence)", fontsize=10)
+    r = e9["ranking"]
+    for ax, gt in zip(axes[1:], ["pct50", "equal_hours"]):
+        for cand in ["degree_centrality", "eigenvector_centrality", "koopman_D1", "koopman_D2", "koopman_D3",
+                     "koopman_influence_D3"]:
+            g = r[(r["ground_truth"] == gt) & (r["candidate"] == cand)].sort_values("gamma")
+            ax.plot(g["gamma"], g["spearman_rho"], marker="o", label=cand)
+        ax.axhline(0, color="gray", linestyle=":")
+        ax.set_ylim(-1.05, 1.05)
+        ax.set_title(f"Spearman rho vs ground truth {'A (50% cut)' if gt == 'pct50' else 'B (equal hours)'}",
+                     fontsize=10)
+    for ax in axes:
+        ax.set_xscale("log")
+        ax.set_xlabel("gamma at the ridge point (per day)")
+    axes[0].legend(fontsize=7)
+    axes[2].legend(fontsize=7, loc="lower left")
+    fig.suptitle("E9: how results move along the calibration ridge (all points within 5% of the best loss)")
+    fig.tight_layout()
+    fig.savefig(config.RESULTS_FIGURES_DIR / "p11_e9_ridge_sensitivity.png", dpi=150)
+    plt.close(fig)
 
 
 if __name__ == "__main__":

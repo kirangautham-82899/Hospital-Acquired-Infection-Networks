@@ -202,3 +202,47 @@ def test_p10_pairwise_comparisons_sign_and_verdict():
     assert out.loc["koopman_x", "verdict"] == "better"
     assert out.loc["worse_x", "advantage_mean"] == pytest.approx(-1.0)
     assert out.loc["worse_x", "verdict"] == "worse"
+
+
+# ------------------------------------------------------- E9 (ridge) ----
+
+def test_ridge_points_picks_profile_minimum_within_tolerance():
+    from src.ridge_sensitivity import ridge_points
+
+    grid = pd.DataFrame({
+        "beta":    [1, 2, 1, 2, 1, 2],
+        "gamma":   [.1, .1, .2, .2, .3, .3],
+        "epsilon": [0, 0, 0, 0, 0, 0],
+        "loss":    [1.00, 1.20, 1.10, 1.03, 2.00, 1.90],
+    })
+    pts = ridge_points(grid, tol=0.05)
+    # gamma .1 -> beta 1 (loss 1.00); gamma .2 -> beta 2 (1.03 <= 1.05); gamma .3 excluded (1.90)
+    assert pts["gamma"].tolist() == [.1, .2]
+    assert pts["beta"].tolist() == [1, 2]
+
+
+def test_e9_summary_rows_counts_verdicts():
+    from src.build_p11 import e9_summary_rows
+
+    points = pd.DataFrame({"gamma": [1e-4, 1e-3], "beta": [1, 1], "epsilon": [0, 0], "loss": [1, 1]})
+    params = pd.DataFrame({"spectral_radius": [1.01, 0.99, 1.02, 1.00]})
+    forecast = pd.DataFrame({"h": [1, 1], "rmse_diff": [0.01, -0.01], "ci_low": [0.001, -0.02],
+                             "ci_high": [0.02, -0.001]})
+    ranking = pd.DataFrame([{"ground_truth": gt, "candidate": c, "spearman_rho": v, "gamma": g}
+                            for gt in ["pct50", "equal_hours"]
+                            for c in ["degree_centrality", "koopman_D3", "koopman_influence_D3"]
+                            for g, v in [(1e-4, 0.2), (1e-3, 0.8)]])
+    iv = pd.DataFrame({
+        "strategy": ["degree_centrality", "degree_centrality", "koopman_D3", "koopman_D3"],
+        "reference": ["random", "whole_hospital", "degree_centrality", "degree_centrality"],
+        "verdict": ["better", "not distinguishable", "worse", "better"],
+    })
+    rows = pd.DataFrame(e9_summary_rows(points, {"params": params, "forecast": forecast,
+                                                 "ranking": ranking, "interventions": iv}))
+    assert "0.9900..1.0200" in rows.iloc[0]["detail"]
+    h1 = rows[rows["description"].str.contains("h=1")].iloc[0]
+    assert "worse in 1, better in 1 of 2" in h1["detail"]
+    deg = rows[rows["description"].str.contains("degree-targeted vs random")].iloc[0]
+    assert deg["value"] == 0.5
+    kd = rows[rows["description"].str.contains("Koopman-targeted vs degree")].iloc[0]
+    assert "better 1, worse 1, tied 0 of 2" in kd["detail"]

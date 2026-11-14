@@ -90,3 +90,8 @@ ROBUSTNESS_N_REPLICATES = 100  # standard replicate count for E1, E4, E5, E6 (ma
 ROBUSTNESS_ALT_SEED = 20261225  # E1: a different global seed
 ROBUSTNESS_REPLICATE_COUNTS = [30, 300]  # E3: vs P9's standard 100
 ROBUSTNESS_LAMBDA_MULTIPLIERS = [0.1, 10.0]  # E2: vs each dictionary's P6-selected lambda
+# E9 (second review, Nov 14): rerun P4-P10 at every near-optimal gamma on
+# the calibration ridge (src/ridge_sensitivity.py). P10 is rerun only for
+# these (k, R) cells to keep the cost down: the smallest-k mid cut and the
+# largest budget.
+E9_INTERVENTION_CELLS = [(1, 0.50), (2, 0.75)]

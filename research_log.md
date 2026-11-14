@@ -1200,3 +1200,130 @@ mode shares are fragile.
 | exact Spearman p for rho=0.943, n=6 | 12/720 = 0.01667 | 0.01667 | yes |
 | D3 rank(K) | 19 | 19 | yes |
 | trajectory split | 210/44/46 | 210/44/46 | yes |
+
+
+## Nov 14: demo add-on (presentation only, outside the P0-P12 phases)
+
+Asked for an animated hospital demonstration for the review. Not a phase:
+it adds no new science and changes no P1-P11 result.
+
+### Decisions
+- **Exception to "Python only" (CLAUDE.md), for the demo front end only.**
+  All science stays in Python: `src/demo_export.py` runs the existing
+  `simulate_sis` with P4's calibrated (beta, gamma, epsilon), P4's
+  calibration initial condition and P10's common random numbers, then
+  writes `demo/data/demo_data.js`. The page (`demo/*.html|js|css`) only
+  draws that file. It uses no external libraries and runs offline from disk.
+  Chosen by the user over Pygame and Streamlit.
+- **Precomputed scenarios, no live re-simulation in the browser** (user's
+  choice). 31 scenarios: baseline; 4 strategies (whole hospital,
+  degree, Koopman dominant mode D3, Koopman influence D3) x k=1,2 x R=25/50/75%,
+  with ward picks read from p10_intervention_results.csv; and an outbreak
+  seeded with 3 cases in each of the 6 groups.
+- The animated run is seed pair 0 for every scenario (config
+  DEMO_ANIMATED_REPLICATE). It is fixed, not chosen to look good. Mean curves
+  and 10-90% bands come from 50 replicates (DEMO_N_CURVE_REPLICATES).
+  Headline intervention numbers shown are P10's 200-replicate values and
+  pairwise verdicts, not new ones.
+- **Arrow "source" is a display attribution only.** The colonized contact
+  with the most hours that day, or "importation" if the person had no
+  colonized contact that day. The model itself sums every colonized contact
+  into one hazard.
+- No calc_ident in the exported file (ward and role only). The file is
+  git-ignored because it is derived from data/raw.
+- Floor plan is schematic and labelled as such on screen.
+
+### Things the demo makes visible (stated on screen, not hidden)
+- With the calibrated rates, transmission is slow. In the animated baseline,
+  30 people become colonized over 117 days, and on only 8 days does a case
+  have a colonized contact. In the outbreak runs most new cases are
+  importations rather than spread from the seeds. The outbreak text says so.
+- Forecast tab repeats P8: EDMD is level with persistence at h=1-2 and
+  slightly worse at h=3-4.
+- Interventions tab repeats P10: targeting beats whole-hospital and random,
+  but Koopman picks mostly match degree. Only D3 dominant mode beats degree
+  significantly, at k=2, R=75% (+31, CI 7 to 55).
+
+### Verification
+- tests/test_demo_export.py: 11 tests (event compression round trip and hand
+  case, attribution hand cases, outbreak seeding, daily summary by hand,
+  ward picks/scales vs P10 table, no identifiers in the export, replayed
+  person-days per scenario, contact count vs edges_master.csv, mean curves
+  vs P10 per-replicate table). Full suite: 205 passed.
+- Cross-checks by independent methods:
+
+| metric | expected | computed | match? |
+|---|---|---|---|
+| baseline mean person-days, 50 reps | 10599.060 (csv module on p10_per_replicate.csv) | 10599.060 | yes |
+| baseline animated person-days | 11023 (fresh simulate_sis, seed pair 0) | 11023 | yes |
+| baseline initial colonized | 79 (fresh simulate_sis) | 79 | yes |
+| replicate 0 person-days vs P10 | 11023.0 (p10_per_replicate.csv) | 11023 | yes |
+| JS replay person-days, all 31 scenarios | animated_person_days from export | 0 mismatches | yes |
+- Checked in a browser at 1536x864 (dark and light) and 375px width; no
+  console errors.
+
+## Nov 14 (second review pass): E9 calibration-ridge sensitivity, softer P8 wording
+
+Two weak spots remained after the first fixes: (1) P5-P10 all rest on ONE
+point of a calibration ridge the data cannot resolve (gamma is bounded only
+from above), and the first and second runs already disagreed on several
+results; (2) "measurably worse than persistence" leaned on a percentile
+block bootstrap with only 5 clusters, which tends to give intervals that are
+too narrow, for a gap of about a tenth of the sampling SE.
+
+### E9 (src/ridge_sensitivity.py, wired into src/build_p11.py)
+For every grid gamma whose profile loss is within CALIBRATION_NEAR_OPTIMAL_TOL
+(5%) of the best, take the loss-minimizing (beta, epsilon) at that gamma:
+gamma = 1.0e-4, 2.15e-4 (main), 4.64e-4, 1.0e-3, 2.15e-3; beta = 7.94e-4 at
+all five; epsilon = 2.66e-4 except 7.07e-4 at the largest gamma. At each
+point rerun, with the main pipeline's seeds: P4 trajectories, P5 lift +
+split, P6 fit with lambda selection (build_for_dictionary reused), P7 mode
+shares + influence, P8 holdout test vs persistence, P9 both ground truths
+(100 replicates), P10 cells (k=1,R=50%) and (k=2,R=75%) with 200 replicates
+(config.E9_INTERVENTION_CELLS). Outputs p11_e9_{ridge_points,models,forecast,
+ranking,interventions}.csv, p11_e9_ridge_sensitivity.png, and 13 E9 rows in
+p11_summary.csv. E1-E8 outputs unchanged by the rerun.
+
+End-to-end check: at the main point E9 reproduces the main pipeline exactly
+(spectral radii 1.01438/1.02183/1.01560, P8 h=4 D1 +0.00529 [0.00070,
+0.00790], rho degree 0.943, koopman_D3 0.829, influence_D3 0.771, D3-vs-degree
++30.86 [6.85, 54.87]).
+
+Results across the 5 points:
+- Spectral radius 1.0000-1.0231 (smaller gamma -> stronger growth).
+- Sim-test skill vs persistence at h=1: 0.05-0.17.
+- Real holdout RMSE minus persistence: h=1 -0.0003..+0.0009, no CI excludes
+  0; h=3 -0.0023..+0.0042, worse in 6 and better in 2 of 15; h=4
+  -0.0011..+0.0064, worse in 5 of 15. Sign flips along the ridge.
+- rho vs ground truth A: degree 0.943 at every point; eigenvector 0.714 at
+  every point; koopman_D3 mode -0.771..0.829; influence_D3 0.257..0.829;
+  koopman_D2 mode -0.371..0.600. No Koopman score reaches 0.943 anywhere.
+  Koopman top wards change between points (e.g. D3 mode: Sorrel 1, Menard 1,
+  Sorrel 2, Sorrel 2, Sorrel 1).
+- rho vs ground truth B: degree -0.086..0.257, eigenvector 0.143..0.600,
+  Koopman -0.714..0.429. Nothing reliable anywhere.
+- P10: degree-targeted beats random and whole-hospital in 20 of 20
+  comparisons. Koopman vs degree: better 1 (the main-point k=2/R=75% cell),
+  worse 26, tied 33 of 60. Influence D3 never worse (same wards as degree).
+  Koopman D2 mode worse than random/whole-hospital in 9 of 20.
+
+### Wording changes
+REPORT abstract, revision note, 4.1 (main-point result now called small and
+weakly supported, plus a ridge table), 4.2 reading (4), 4.3 item 3, 4.4 (E9
+table), discussion, limitations (new: few forecast start weeks), conclusion;
+README P8/P11; slides (P8/P9/P10 notes, two new E9 slides, 23 slides).
+
+### Verification
+- tests/test_review_fixes.py +2 tests: ridge_points on a hand-made grid
+  (profile minimum per gamma, tolerance filter) and e9_summary_rows verdict
+  counting. Full suite 196 passed.
+- Cross-check by a second method: the E9 rerun at the main point (fresh
+  trajectories, fresh fit, fresh ground truths) against the committed main
+  pipeline tables.
+
+| metric | expected (main pipeline) | computed (E9 at main point) | match? |
+|---|---|---|---|
+| D1 spectral radius | 1.01438 | 1.01438 | yes |
+| P8 D1 h=4 RMSE - persistence | +0.00529 [0.00070, 0.00790] | +0.00529 [0.00070, 0.00790] | yes |
+| rho degree vs A | 0.943 | 0.943 | yes |
+| D3 mode vs degree, k=2 R=75% | +30.86 [6.85, 54.87] | +30.86 [6.85, 54.87] | yes |

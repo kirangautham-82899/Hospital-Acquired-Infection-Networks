@@ -21,22 +21,25 @@ Berck-sur-Mer, France, 2009), three EDMD dictionaries (linear, degree-2
 polynomial, contact-weighted), and ridge-regularized operators fitted on 210
 simulated training trajectories (of 300 generated).
 
-The answer to both questions is **no, not for this dataset**. On real
-holdout weeks no EDMD variant beats a persistence forecast; at 3–4 weeks
-ahead they are measurably worse (block-bootstrap 95% CIs of the RMSE
-difference exclude zero), because the calibrated simulator cannot produce
-the decline seen in the real data. For ward ranking, degree centrality
-matches the main simulated ground truth best (Spearman ρ = 0.94, exact
-p = 0.017), but that ground truth (cut each ward's contacts by 50%) largely
-rewards contact volume by construction. Under a second ground truth that
-removes the *same* number of contact-hours from every ward, no candidate,
-Koopman or centrality, ranks the wards reliably (|ρ| ≤ 0.60, all p ≥ 0.24).
-The SIS calibration is weakly identified: the data bound the decolonization
-rate only from above (γ ≲ 2×10⁻³/day), and several downstream Koopman
-results change when a different point on that ridge is used. Targeting
-wards by contact volume beats random and whole-hospital allocation at
-every budget (paired 95% CIs exclude zero), but even the best strategy
-prevents under 5% of colonized person-days in this model.
+The answer to both questions is **no, not for this dataset**. The SIS
+calibration is weakly identified: the data bound the decolonization rate
+only from above (γ ≲ 2×10⁻³/day). We therefore rerun the whole downstream
+pipeline at all five near-optimal calibration points (experiment E9) and
+report only conclusions that hold at every point. On real holdout weeks no
+EDMD variant beats a persistence forecast one week ahead at any point; at
+3–4 weeks the sign of the small gap depends on the calibration point, and
+all differences (at most 0.0064 RMSE) are about a tenth of the sampling
+error of a weekly ward prevalence. For ward ranking, degree centrality
+matches the main simulated ground truth (cut each ward's contacts by 50%)
+with Spearman ρ = 0.94 (exact p = 0.017) at every calibration point, but
+that ground truth largely rewards contact volume by construction; no
+Koopman score reaches ρ = 0.94 at any point, and the Koopman scores swing
+between −0.77 and 0.83. Under a second ground truth that removes the *same*
+number of contact-hours from every ward, no candidate ranks the wards
+reliably at any point. Targeting wards by contact volume beats random and
+whole-hospital allocation in every comparison at every calibration point
+(paired 95% CIs exclude zero), but even the best strategy prevents under 5%
+of colonized person-days in this model.
 
 ---
 
@@ -81,7 +84,11 @@ uncertainty; "statistically indistinguishable" was claimed without a test;
 and unstable eigenvalues were not reported. All six are fixed in this
 version (details in §3.3, §3.6, §4.1–4.3 and `research_log.md`). Fixing the
 calibration changed several downstream numbers; where a conclusion changed,
-this report says so.
+this report says so. A second review pass found that the main results still
+rested on one arbitrary point of an unidentified calibration ridge, and that
+"measurably worse than persistence" leaned on a 5-block bootstrap.
+Experiment E9 (§4.4) now reruns P4–P10 at every near-optimal calibration
+point, and every headline claim states whether it holds across all of them.
 
 Every number below is read from the saved `results/tables/*.csv` outputs of
 a full pipeline run (`python run_all.py`).
@@ -386,22 +393,33 @@ persistence), with 95% bootstrap CI:
 
 (Persistence RMSE: 0.0464 at h=1, 0.0865 at h=3, 0.0868 at h=4.)
 
-**Result.** At h=1 the EDMD forecasts cannot be told apart from persistence
-(differences under 0.001, about 1/60 of the sampling SE). At h=3–4 they are
-consistently, if slightly, *worse*: the CIs exclude zero for D1 and D3 at
-both horizons and for D2 at h=3. The cause is the sim-to-real mismatch from
-§3.3: the operators learned the simulator's slow upward drift, while real
-prevalence fell in the holdout. The historical mean is the best model at
-h=3–4 by point estimate (skill ≈ 0.20 vs persistence), but its advantage is
-not significant with 5 start weeks.
+**Result at the main calibration point.** At h=1 the EDMD forecasts cannot
+be told apart from persistence (differences under 0.001, about 1/60 of the
+sampling SE). At h=3–4 they are slightly worse, and for D1 and D3 the CIs
+exclude zero. This is a small effect resting on weak evidence: the largest
+gap (0.0058) is about a tenth of the sampling SE, and percentile bootstrap
+intervals built from only 5 clusters tend to be too narrow. The direction is
+explained by the sim-to-real mismatch from §3.3: at this point the operators
+learned the simulator's slow upward drift, while real prevalence fell in the
+holdout. The historical mean is the best model at h=3–4 by point estimate
+(skill ≈ 0.20 vs persistence), but its advantage is not significant with 5
+start weeks.
 
-**Sensitivity to the calibration point.** With the first version's
-calibration point (γ = 1.67×10⁻³, also on the near-optimal ridge), the
-operators were close to neutral (D1 spectral radius 1.0000) and matched
-persistence at every horizon (h=3 RMSE 0.0864 vs 0.0865). So the sign of the
-EDMD-vs-persistence gap at longer horizons depends on where on the
-unidentified γ ridge the simulator is placed. The robust statement is that
-EDMD never beats persistence on the real data.
+**Across the calibration ridge (E9, §4.4).** Rerunning P4–P8 at all five
+near-optimal γ values (1×10⁻⁴ to 2.2×10⁻³/day):
+
+| Horizon | EDMD RMSE − persistence (15 model × point cases) | CI excludes 0: worse / better |
+|---|---|---|
+| h=1 | −0.0003 to +0.0009 | 0 / 0 |
+| h=3 | −0.0023 to +0.0042 | 6 / 2 |
+| h=4 | −0.0011 to +0.0064 | 5 / 0 |
+
+The long-horizon gap is positive at low γ (strong drift), near zero at
+γ = 10⁻³, and slightly negative for D2/D3 at h=3 at γ = 2.2×10⁻³. **The
+statement that holds at every point is: EDMD forecasts are practically
+indistinguishable from persistence one week ahead, and never clearly better
+at longer horizons.** Whether they are slightly worse depends on an
+unidentified parameter.
 
 ### 4.2 Superspreader Ward Risk Score vs. Centrality (P9)
 
@@ -447,11 +465,13 @@ that "volume" drives ground truth A. (2) Against B, *no* candidate ranks
 the wards reliably; ground truth B itself has little signal beyond "Sorrel 1
 first", so n = 6 with overlapping CIs cannot separate the candidates. (3) The
 Koopman scores do not beat degree on A and are not better than chance on
-B; the new influence score does not change this. (4) The Koopman scores are
-also unstable across calibration points: with the first version's
-calibration, the three mode-share scores had ρ = 0.26–0.54 against A; now
-they range from −0.37 to 0.83. Degree centrality does not depend on the
-simulator and stayed at 0.943.
+B; the new influence score does not change this. (4) Across all five
+near-optimal calibration points (E9), degree's ρ against A is 0.943 every
+time, while the Koopman scores move a lot: mode share D3 from −0.77 to 0.83,
+influence D3 from 0.26 to 0.83, and their top ward changes between points.
+No Koopman score reaches 0.943 at any point. Against B, no candidate is
+reliable at any point (degree −0.09 to 0.26, eigenvector 0.14 to 0.60,
+Koopman scores −0.71 to 0.43).
 
 ### 4.3 Intervention Simulation (P10)
 
@@ -472,6 +492,8 @@ person-days.
    Degree-targeted beats both random and whole-hospital in all 6 cells
    (all CIs exclude zero); for example at k=2, R=75% it prevents 489
    person-days (CI 456–521) vs 285 for random and 286 for whole-hospital.
+   It also beats both in all 20 E9 comparisons (two cells × five
+   calibration points × two references).
 2. **Not every score helps.** Koopman D2 mode-share targeting (Sorrel 2,
    then Sorrel 2 + Sorrel 0) is *worse* than both random and whole-hospital
    in all 6 cells. The first version's claim that "almost any" score beats
@@ -481,9 +503,12 @@ person-days.
    D3 mode-share picks Menard 1 + Sorrel 1 at k=2: it ties degree at
    R = 25% (+1.2, CI −12.2 to +14.6) and 50% (+7.0, CI −12.4 to +26.4) and
    beats it at R = 75% (+30.9 person-days, CI +6.9 to +54.9, p = 0.012).
-   That single significant cell is one of 48 comparisons against degree,
-   so it is suggestive, not established. All other Koopman choices tie or
-   lose to degree.
+   That single significant cell is one of 48 comparisons against degree.
+   It also does not survive E9: across the five calibration points,
+   Koopman-targeted strategies beat degree in 1 of 60 comparisons (this
+   one), lose in 26 and tie in 33. The Koopman D3 influence score is never
+   worse than degree because it picks the same wards. All other Koopman
+   choices tie or lose to degree.
 4. **Random vs whole-hospital** cannot be told apart in any cell.
 5. **Effect sizes are small.** The best strategy prevents 4.9% of colonized
    person-days (Koopman D3, k=2, R=75%); degree-targeted 4.5%. With almost
@@ -491,7 +516,7 @@ person-days.
    so contact cuts can only prevent new acquisitions. The first version's
    phrase "targeting matters enormously" overstated this.
 
-### 4.4 Robustness Experiments E1–E8 (P11)
+### 4.4 Robustness Experiments E1–E9 (P11)
 
 Each experiment perturbs one axis and reports a Spearman ρ (rank-based) or
 RMSE ratio (magnitude-based) against the corresponding baseline result.
@@ -507,6 +532,7 @@ E1–E6 test ground truth A or degree centrality, not the Koopman scores.
 | E6 | Patients-only population | 329-person, 5-ward population (locked sensitivity run) | ρ = 1.000 |
 | E7 | Missing-data handling | Carry-forward vs no-imputation scoring, D1/D2/D3 ranking | ρ = 0.50 |
 | E8 | D3 structural redundancy | Drop the provably redundant Wx block (19 vs 25 features) | RMSE ratio 0.999, dominant ward **differs** (Menard 1 → Sorrel 2) |
+| E9 | Calibration ridge, full pipeline | Rerun P4–P10 at all 5 near-optimal γ (1×10⁻⁴ … 2.2×10⁻³) | see below |
 
 **Reading.** Ground truth A's ward ranking is very stable (E1, E3–E6): it is
 driven by Menard 1's large contact volume, a fixed feature of the data. E7's
@@ -517,6 +543,32 @@ mode's top ward: **the eigenmode ward shares are fragile** even when the
 forecasts are not. The E1 value equals degree's ρ against A by coincidence:
 both are one adjacent-rank swap out of 6, the smallest non-zero
 perturbation (derivation in `research_log.md`).
+
+**E9: the whole pipeline along the calibration ridge (added in the second
+review, `src/ridge_sensitivity.py`).** For each grid γ whose profile loss is
+within 5% of the best (γ = 1.0×10⁻⁴, 2.2×10⁻⁴, 4.6×10⁻⁴, 1.0×10⁻³,
+2.2×10⁻³/day, each with the loss-minimizing β and ε at that γ), E9
+regenerates the 300 training trajectories with the main pipeline's seeds,
+refits D1–D3 with λ selection, recomputes mode shares and influence scores,
+reruns the real-data forecast test, both ground truths (100 replicates) and
+two P10 cells (k=1, R=50% and k=2, R=75%; 200 replicates). At the main
+point E9 reproduces the main pipeline's numbers exactly, an end-to-end check
+of the rerun.
+
+| Quantity | Range over the 5 points | Holds at every point? |
+|---|---|---|
+| EDMD spectral radius | 1.000 – 1.023 (lower γ → larger) | — |
+| EDMD vs persistence, h=1 | −0.0003 to +0.0009, never significant | yes: no difference |
+| EDMD vs persistence, h=3–4 | −0.0023 to +0.0064 | no: sign depends on γ |
+| ρ(degree, ground truth A) | 0.943 – 0.943 | yes |
+| ρ(Koopman D3 mode share, A) | −0.771 – 0.829 | no |
+| ρ(Koopman D3 influence, A) | 0.257 – 0.829 | no |
+| ρ(any candidate, ground truth B) | −0.71 – 0.60 | yes: none reliable |
+| Degree-targeted vs random / whole-hospital | better in 20 of 20 | yes |
+| Koopman-targeted vs degree-targeted | better 1, worse 26, tied 33 of 60 | yes: never reliably better |
+
+Figure `p11_e9_ridge_sensitivity.png` plots the forecast gap and the
+Spearman values against γ.
 
 ---
 
@@ -529,11 +581,12 @@ perturbation (derivation in `research_log.md`).
 
 2. **Forecasting: no gain on real data, and the reason is the simulator,
    not the operator.** EDMD beats persistence on simulated test
-   trajectories (15–28%) but not on real data. The calibrated simulator is
-   a closed population with almost no decolonization; it can only drift
-   upward, while the real holdout declined. Any model trained on it
-   inherits that drift. A simulator with admissions and discharges would
-   be needed to represent decline.
+   trajectories (15–28% at the main point) but not on real data, at any
+   calibration point. The calibrated simulator is a closed population with
+   little or no decolonization; it drifts upward, while the real holdout
+   declined. Any model trained on it inherits that drift, and how much
+   depends on γ, which the data cannot pin down. A simulator with
+   admissions and discharges would be needed to represent decline.
 
 3. **Superspreader ranking: the main ground truth mostly measures volume.**
    Degree centrality "wins" ground truth A largely by construction. Under
@@ -543,16 +596,19 @@ perturbation (derivation in `research_log.md`).
    "neither approach demonstrates superspreader detection beyond contact
    volume on this dataset."
 
-4. **Koopman scores depend on an unidentified parameter.** Moving along the
-   calibration ridge changed the Koopman scores' correlation with ground
-   truth A from 0.26–0.54 to −0.37–0.83, and E8 shows mode shares are
-   fragile. Scores derived from the simulator cannot be more reliable than
+4. **Koopman scores depend on an unidentified parameter.** Across the five
+   near-optimal calibration points (E9) the Koopman scores' correlation
+   with ground truth A ranges from −0.77 to 0.83 and their top ward
+   changes, and E8 shows mode shares are fragile even at a fixed point.
+   Degree centrality needs no simulator and gives the same answer at every
+   point. Scores derived from the simulator cannot be more reliable than
    the simulator's calibration.
 
 5. **Practical message.** Concentrating a fixed contact-reduction budget on
    the highest-volume wards beats spreading it evenly or choosing wards at
-   random, with paired CIs excluding zero at every budget. The absolute
-   gain in this model is small (under 5% of colonized person-days).
+   random, with paired CIs excluding zero at every budget and every
+   calibration point. The absolute gain in this model is small (under 5% of
+   colonized person-days).
 
 A time-varying network-aware dictionary (week-specific `W_t`) and a
 simulator with patient turnover are the two most promising extensions.
@@ -562,7 +618,11 @@ simulator with patient turnover are the two most promising extensions.
 ## 6. Limitations
 
 - **About 16 real weekly snapshots.** The decolonization rate is identified
-  only from above; β and ε are each identified within a factor of 4–7.
+  only from above; β and ε are each identified within a factor of 4–7. E9
+  shows which conclusions survive this; the Koopman scores and the sign of
+  the long-horizon forecast gap do not.
+- **Few forecast start weeks.** Each holdout horizon has only 5 start weeks,
+  so the block-bootstrap CIs in §4.1 are rough and likely too narrow.
 - **Closed population.** No admission or discharge dates, so the simulator
   cannot reproduce declining prevalence. This is the main reason for the
   sim-to-real forecasting gap.
@@ -584,14 +644,16 @@ simulator with patient turnover are the two most promising extensions.
 This project built a complete, tested pipeline from a real hospital contact
 network to a Koopman/EDMD forecasting and ward-targeting system, and used it
 to test its own central hypothesis. For this dataset, Koopman/EDMD forecasts
-do not beat persistence on real data (and are slightly worse at 3–4 weeks),
-and no Koopman-based score identifies high-impact wards better than contact
-volume. A review of the first version showed that two earlier conclusions
-were stronger than the evidence: the decolonization rate is not identified,
-and the main ground truth largely rewards contact volume by construction.
-Both are now fixed and reported. What holds up is that, in this model,
-targeting the highest-contact wards beats untargeted allocation at every
-budget, although the absolute effect is small. Future work should add
+do not beat persistence on real data, and no Koopman-based score identifies
+high-impact wards better than contact volume; both statements hold at every
+calibration point the data cannot rule out (E9). A review of the first
+version showed that earlier conclusions were stronger than the evidence:
+the decolonization rate is not identified, and the main ground truth largely
+rewards contact volume by construction. Both are now fixed and reported,
+and every headline claim was rechecked across the whole calibration ridge.
+What holds up is that, in this model, targeting the highest-contact wards
+beats untargeted allocation at every budget and every calibration point,
+although the absolute effect is small. Future work should add
 patient turnover to the simulator, build a week-specific network dictionary,
 and use a larger or multi-site dataset.
 
@@ -621,7 +683,7 @@ in [research_log.md](research_log.md).
 
 - **32 modules** in `src/`, one per pipeline concern plus one orchestrator
   per phase.
-- **194 tests** in `tests/`, all passing, including exact-recovery checks
+- **196 tests** in `tests/`, all passing, including exact-recovery checks
   against closed-form solutions, hand-built synthetic networks with known
   outcomes, hand-computed checks of every review fix (profile loss, Koopman
   influence on a known operator, equal-hours cuts, paired CIs vs scipy,
