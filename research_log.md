@@ -1327,3 +1327,67 @@ README P8/P11; slides (P8/P9/P10 notes, two new E9 slides, 23 slides).
 | P8 D1 h=4 RMSE - persistence | +0.00529 [0.00070, 0.00790] | +0.00529 [0.00070, 0.00790] | yes |
 | rho degree vs A | 0.943 | 0.943 | yes |
 | D3 mode vs degree, k=2 R=75% | +30.86 [6.85, 54.87] | +30.86 [6.85, 54.87] | yes |
+
+## Nov 15 (third review pass): E9 over beta and epsilon too; stronger ground truth B
+
+Two optional weaknesses from the third review, both now addressed.
+
+### 1. E9 only moved gamma
+beta was fixed at 7.94e-4 at all five points although it is only identified
+within a factor of 4. ridge_points() now takes the union of the
+near-optimal profile points along every axis in config.E9_RIDGE_AXES
+(gamma, beta, epsilon), recording which profiles each point lies on. Nine
+points: the five gamma points, beta 1.99e-4 (eps 7.07e-4) and 3.98e-4
+(eps 2.66e-4), and epsilon 1e-4 (beta 7.94e-4) and 7.07e-4 (beta 3.98e-4);
+all with gamma 2.15e-4 except the gamma-profile points. Losses
+0.00497-0.00518.
+
+### 2. Ground truth B had too little signal
+With P9_EQUAL_HOURS_FRACTION_OF_MIN=0.5 (1,602 h removed, 100 replicates) the
+drops were 20-44 person-days with overlapping CIs. Now 0.9 (2,884 h removed:
+Other keeps 10% of its contacts, Menard 1 loses 9.4%) with
+P9_EQUAL_HOURS_N_REPLICATES=400. Choosing a larger removal after seeing a
+weak result is a design change, not a fit to the candidates: 0.9 was
+chosen only to give the ground truth more signal (close to the largest
+possible equal removal, 1.0 = cutting Other entirely), it was fixed before
+the new correlations were computed, and both versions are reported.
+New drops (95% CI): Sorrel 1 69.6 (61.6-77.5), Sorrel 0 51.3 (44.2-58.3),
+Menard 2 49.4 (43.0-55.8), Menard 1 42.6 (35.2-50.1), Other 39.4
+(33.6-45.2), Sorrel 2 33.1 (27.7-38.5).
+Main-point Spearman vs B: betweenness 0.802 (p 0.10; three wards tie at 0),
+koopman_D3 mode 0.600, eigenvector 0.314, degree 0.200, influence D2 -0.029,
+koopman_D2 -0.086, influence D3 -0.257, koopman_D1 -0.314, influence D1
+-0.486. Nothing significant. Ground truth A unchanged.
+
+### E9 results over the nine points
+- Spectral radius 1.0000-1.0269; sim-test skill at h=1 0.05-0.22.
+- Real holdout RMSE minus persistence (27 cases per horizon): h=1
+  -0.0003..+0.0011, none significant; h=2 better in 2 (D2 at gamma 1e-3 and
+  2.15e-3); h=3 worse 13, better 2 (D2, D3 at gamma 2.15e-3); h=4 worse 13,
+  better 0; max gap +0.0092. Worse cases occur at all six points with
+  gamma <= 2.15e-4.
+- rho vs A: degree 0.943 at 8 points, 0.886 at (beta 1.99e-4), exact
+  p <= 0.033 everywhere; eigenvector 0.714-0.771; koopman_D3 mode
+  -0.771..0.943 (0.943 at gamma 2.15e-4, eps 1e-4 only); influence D3
+  0.086..0.829.
+- rho vs B: all candidates -0.886..0.829; the only exact p < 0.05 is
+  influence D3 = -0.886 (wrong sign) at beta 1.99e-4.
+- P10 cells: degree beats random and whole-hospital 36 of 36. Koopman vs
+  degree: better 2 (koopman_D3 Menard 1+Sorrel 1 at k=2/R=75%, at the main
+  point and at eps 1e-4), worse 51, tied 55 of 108. Influence D3: 16 tied,
+  2 worse.
+
+### Verification
+- tests: ridge_points now has a gamma-only case, a union case where the
+  beta profile adds a new point (hand-made grid), and the axes label. 197
+  passed.
+- E9 at the main point again reproduces the main pipeline (same as the
+  previous pass); P9 ground truth A and P10 unchanged by this pass.
+- Report numbers cross-checked against p11_e9_*.csv and p9_*.csv by script.
+
+| metric | expected | computed | match? |
+|---|---|---|---|
+| removed hours per ward | 0.9 x 3,204.38 = 2,883.94 | 2,883.9 | yes |
+| E9 points | 5 gamma + 2 beta + 2 epsilon | 9 | yes |
+| degree vs random/whole comparisons | 2 cells x 9 points x 2 refs = 36 | 36 better | yes |
+| Koopman vs degree comparisons | 2 cells x 9 points x 6 scores = 108 | 108 | yes |

@@ -10,7 +10,8 @@ Two ground truths (second added after the Nov 14 review):
     high-volume ward loses more contact-hours, so degree centrality is
     expected to match this ranking largely by construction.
   - "equal_hours": remove the SAME number of contact-hours from each ward
-    (config.P9_EQUAL_HOURS_FRACTION_OF_MIN of the smallest ward's volume).
+    (config.P9_EQUAL_HOURS_FRACTION_OF_MIN of the smallest ward's volume,
+    config.P9_EQUAL_HOURS_N_REPLICATES replicates).
     This asks which ward's contact-hours matter most per hour, which
     degree does not answer by construction.
 
@@ -78,7 +79,7 @@ def build(n_replicates=100):
     removed_hours = config.P9_EQUAL_HOURS_FRACTION_OF_MIN * touching.min() / 3600.0
     gt_eq, _ = superspreader_experiment(
         people, index, day_list, edges, admission, beta, gamma, epsilon,
-        pre_window_last_status, groups, n_replicates=n_replicates, ward_scales=scales,
+        pre_window_last_status, groups, n_replicates=config.P9_EQUAL_HOURS_N_REPLICATES, ward_scales=scales,
     )
     gt_eq.insert(1, "touching_contact_hours", touching.loc[groups].to_numpy() / 3600.0)
     gt_eq.insert(2, "removed_contact_hours", removed_hours)

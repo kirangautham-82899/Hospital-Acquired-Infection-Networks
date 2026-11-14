@@ -227,7 +227,7 @@ def build():
             "P7 Eigenmodes + Koopman influence  →  P8 Real-data forecasting validation",
             "P9 Superspreader score vs. centrality  →  P10 Intervention simulation",
             "P11 Robustness experiments E1–E9 (E9: rerun P4–P10 along the calibration ridge)",
-            "196 automated tests; every decision and the Nov 14 review fixes logged",
+            "197 automated tests; every decision and the Nov 14 review fixes logged",
         ],
     )
 
@@ -308,7 +308,7 @@ def build():
             ["historical mean", "+0.0228 [+0.0110, +0.0384]", "−0.0173 [−0.0427, +0.0078]", "−0.0176 [−0.0402, +0.0037]"],
         ],
         note="Main calibration point; block-bootstrap 95% CIs from only 5 start weeks (rough). Positive = worse.\n"
-             "Across all 5 calibration points (E9): tied at h=1 everywhere; at h=3–4 the sign flips with γ.",
+             "Across all 9 calibration points (E9): tied at h=1 everywhere; at h=3–4 tied or worse except 2 of 54 cases.",
     )
 
     add_section_slide(prs, "The Central Question:\nKoopman Scores vs. Simple Centrality")
@@ -320,8 +320,8 @@ def build():
             "A: cut each ward's contacts 50% (locked design)",
             "Caveat: A removes more hours from busy wards, so it rewards "
             "contact volume (= degree) by construction",
-            "B (added): remove the SAME 1,602 contact-hours from every ward",
-            "Under B only Sorrel 1 stands out; other wards overlap",
+            "B (added): remove the SAME 2,884 contact-hours from every ward (400 replicates)",
+            "Under B Sorrel 1 is clearly first, Sorrel 2 last; the middle four partly overlap",
         ],
         caption="Figure: drop in colonized person-days, 100 paired replicates, 95% CIs.",
     )
@@ -330,14 +330,14 @@ def build():
         prs, "Ward Scores vs. Ground Truth: Spearman ρ (exact p)",
         ["Candidate", "vs A (50% cut)", "vs B (equal hours)"],
         [
-            ["degree centrality", "0.943 (p=0.017)", "0.257 (p=0.66)"],
-            ["Koopman D3 mode share", "0.829 (p=0.058)", "0.200 (p=0.71)"],
-            ["Koopman D3 influence", "0.771 (p=0.10)", "0.086 (p=0.92)"],
-            ["eigenvector centrality", "0.714 (p=0.14)", "0.600 (p=0.24)"],
-            ["Koopman D1 mode share", "0.600 (p=0.24)", "−0.486 (p=0.36)"],
-            ["Koopman D2 mode share", "−0.371 (p=0.50)", "−0.486 (p=0.36)"],
+            ["degree centrality", "0.943 (p=0.017)", "0.200 (p=0.71)"],
+            ["Koopman D3 mode share", "0.829 (p=0.058)", "0.600 (p=0.24)"],
+            ["Koopman D3 influence", "0.771 (p=0.10)", "−0.257 (p=0.66)"],
+            ["eigenvector centrality", "0.714 (p=0.14)", "0.314 (p=0.56)"],
+            ["betweenness centrality", "0.309 (p=0.53)", "0.802 (p=0.10, ties)"],
+            ["Koopman D2 mode share", "−0.371 (p=0.50)", "−0.086 (p=0.92)"],
         ],
-        note="Degree wins A (largely by construction) at all 5 calibration points; Koopman scores swing −0.77..0.83.\n"
+        note="Degree is significant vs A (largely by construction) at all 9 calibration points; Koopman swings −0.77..0.94.\n"
              "Under B no candidate ranks the wards reliably at any calibration point (n=6).",
     )
 
@@ -349,8 +349,8 @@ def build():
             "Degree-targeted beats random AND whole-hospital at every budget "
             "and every calibration point",
             "Koopman D2 mode-share targeting is WORSE than random",
-            "Koopman beats degree in 1 of 60 comparisons across all "
-            "calibration points (E9); loses 26, ties 33",
+            "Koopman beats degree in 2 of 108 comparisons across all "
+            "calibration points (E9); loses 51, ties 55",
             "Best strategy prevents < 5% of colonized person-days",
         ],
         caption="Figure: drop vs. budget, one panel per k, 95% paired CIs. Degree and influence D1/D3 pick the same wards, so their lines overlap.",
@@ -368,7 +368,7 @@ def build():
             ["E6", "Patients-only population", "ρ=1.000"],
             ["E7", "Missing-data handling", "ρ=0.50 (3 near-tied models)"],
             ["E8", "D3 structural redundancy", "ratio 0.999, dominant ward DIFFERS"],
-            ["E9", "Whole pipeline at 5 calibration points", "see next slides"],
+            ["E9", "Whole pipeline at 9 calibration points", "see next slides"],
         ],
         note="Ground truth A's ranking is very stable (driven by Menard 1's contact volume).\n"
              "Koopman eigenmode ward shares are fragile (E8).",
@@ -377,19 +377,19 @@ def build():
     add_image_slide(
         prs, "E9: What Holds Across the Calibration Ridge",
         f"{FIG}/p11_e9_ridge_sensitivity.png",
-        caption="Rerun of P4–P10 at all 5 γ values within 5% of the best calibration loss.",
+        caption="Rerun of P4–P10 at all 9 points on the γ, β, ε profiles within 5% of the best calibration loss.",
     )
 
     add_table_slide(
         prs, "E9 Summary: Robust vs. Fragile Conclusions",
         ["Claim", "Range over 5 points", "Holds everywhere?"],
         [
-            ["EDMD ≈ persistence at h=1", "−0.0003 .. +0.0009", "yes"],
-            ["EDMD vs persistence at h=3–4", "−0.0023 .. +0.0064", "no (sign flips)"],
-            ["ρ(degree, ground truth A)", "0.943 .. 0.943", "yes"],
-            ["ρ(Koopman D3 mode, A)", "−0.771 .. 0.829", "no"],
-            ["Degree beats random / whole-hospital", "20 of 20", "yes"],
-            ["Koopman beats degree", "1 of 60", "never reliably"],
+            ["EDMD ≈ persistence at h=1", "−0.0003 .. +0.0011", "yes"],
+            ["EDMD vs persistence at h=3–4", "−0.0023 .. +0.0092", "no (worse 26, better 2 of 54)"],
+            ["ρ(degree, ground truth A)", "0.886 .. 0.943 (all p<0.05)", "yes"],
+            ["ρ(Koopman D3 mode, A)", "−0.771 .. 0.943", "no"],
+            ["Degree beats random / whole-hospital", "36 of 36", "yes"],
+            ["Koopman beats degree", "2 of 108", "never reliably"],
         ],
     )
 
@@ -402,7 +402,7 @@ def build():
             "Ranking: ground truth A mostly measures contact volume; under "
             "equal hours nothing ranks reliably with 6 wards",
             "Koopman scores depend on an unidentified decolonization rate "
-            "(E9: they swing −0.77..0.83; degree does not move)",
+            "(E9: they swing −0.77..0.94; degree stays significant)",
             "Practical: concentrate contact reduction on the busiest wards — "
             "beats random/whole-hospital, but the gain is small (< 5%)",
         ],

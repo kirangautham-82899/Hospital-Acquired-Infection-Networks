@@ -8,9 +8,10 @@ point of that ridge, and comparing the first and second runs showed some
 conclusions move with the point. E9 makes this explicit instead of
 anecdotal.
 
-For every grid gamma inside the near-optimal set, take the (beta,
-epsilon) that minimise the calibration loss at that gamma (the profile
-point), then rerun, with the same seeds as the main pipeline:
+For every grid value of gamma, beta and epsilon (config.E9_RIDGE_AXES)
+inside the near-optimal set, take the other two parameters that minimise
+the calibration loss at that value (the profile point); the union of these
+points is rerun, with the same seeds as the main pipeline:
   P4  training trajectories              (src.trajectories)
   P5  dictionaries + split                (src.build_observables, src.trajectory_split)
   P6  EDMD fit with lambda selection      (src.build_edmd.build_for_dictionary)
@@ -48,16 +49,25 @@ from src.trajectory_split import make_split
 RANDOM_WARD_SEED_BASE = 20261001  # same as src/build_p10.py, so 'random' draws match P10
 
 
-def ridge_points(grid_table, tol=None):
-    """Profile points along gamma: for every grid gamma whose best loss
-    is within `tol` of the overall best, the (beta, gamma, epsilon) row
-    with the lowest loss at that gamma. Sorted by gamma."""
+def ridge_points(grid_table, tol=None, axes=None):
+    """Near-optimal profile points. For each parameter in `axes` and each
+    of its grid values whose best loss is within `tol` of the overall
+    best, take the (beta, gamma, epsilon) row with the lowest loss at that
+    value. Returns the UNION over axes (a point found on several profiles
+    appears once), with an 'axes' column naming the profiles it lies on.
+    Sorted by (gamma, beta, epsilon)."""
     tol = config.CALIBRATION_NEAR_OPTIMAL_TOL if tol is None else tol
+    axes = config.E9_RIDGE_AXES if axes is None else axes
     best = grid_table["loss"].min()
-    idx = grid_table.groupby("gamma")["loss"].idxmin()
-    prof = grid_table.loc[idx]
-    prof = prof[prof["loss"] <= best * (1.0 + tol)]
-    return prof.sort_values("gamma").reset_index(drop=True)
+    found = {}
+    for axis in axes:
+        idx = grid_table.groupby(axis)["loss"].idxmin()
+        prof = grid_table.loc[idx]
+        for i, row in prof[prof["loss"] <= best * (1.0 + tol)].iterrows():
+            found.setdefault(i, []).append(axis)
+    out = grid_table.loc[list(found)].copy()
+    out["axes"] = ["+".join(found[i]) for i in out.index]
+    return out.sort_values(["gamma", "beta", "epsilon"]).reset_index(drop=True)
 
 
 def _fit_models(states, metadata, groups, W):
@@ -106,19 +116,21 @@ def _forecast_rows(models, groups, W, states_real, states_cf):
     return rows
 
 
-def run_point(point, setup, n_gt_replicates=None, n_int_replicates=None):
+def run_point(point, setup, n_gt_replicates=None, n_int_replicates=None, n_eq_replicates=None):
     """Rerun P4 trajectories -> P10 subset at one (beta, gamma, epsilon).
     Returns a dict of DataFrames: params, forecast, ranking, interventions."""
     n_gt = config.ROBUSTNESS_N_REPLICATES if n_gt_replicates is None else n_gt_replicates
+    n_eq = config.P9_EQUAL_HOURS_N_REPLICATES if n_eq_replicates is None else n_eq_replicates
     n_int = config.INTERVENTION_N_REPLICATES if n_int_replicates is None else n_int_replicates
     beta, gamma, epsilon = float(point["beta"]), float(point["gamma"]), float(point["epsilon"])
     groups = setup["groups"]
-    tag = {"gamma": gamma, "beta": beta, "epsilon": epsilon}
+    tag = {"gamma": gamma, "beta": beta, "epsilon": epsilon, "axes": point.get("axes", "")}
 
     # ---- P4 trajectories (same seeds as the main run) + P5/P6 ----
     states, metadata = generate_trajectories(
         config.N_TRAINING_TRAJECTORIES, setup["people"], setup["index"], setup["day_list"],
-        setup["edge_arrays"], setup["admission"], tag, setup["states_real"], groups=groups,
+        setup["edge_arrays"], setup["admission"], {"beta": beta, "gamma": gamma, "epsilon": epsilon},
+        setup["states_real"], groups=groups,
     )
     models = _fit_models(states, metadata, groups, setup["W"])
     params = [{**tag, "loss": float(point["loss"]), "dictionary": n,
@@ -142,7 +154,7 @@ def run_point(point, setup, n_gt_replicates=None, n_int_replicates=None):
     common = (setup["people"], setup["index"], setup["day_list"], setup["edges"], setup["admission"],
               beta, gamma, epsilon, setup["pre_window_last_status"], groups)
     gt_a, _ = superspreader_experiment(*common, n_replicates=n_gt, cut_fraction=0.5)
-    gt_b, _ = superspreader_experiment(*common, n_replicates=n_gt, ward_scales=setup["eq_scales"])
+    gt_b, _ = superspreader_experiment(*common, n_replicates=n_eq, ward_scales=setup["eq_scales"])
     gts = {"pct50": gt_a.set_index("ward")["drop_person_days_mean"].reindex(groups),
            "equal_hours": gt_b.set_index("ward")["drop_person_days_mean"].reindex(groups)}
     ranking = []
@@ -240,7 +252,7 @@ def e9_calibration_ridge(common_setup):
     parts = {"params": [], "forecast": [], "ranking": [], "interventions": []}
     for _, point in points.iterrows():
         print(f"  ridge point gamma={point['gamma']:.3g} beta={point['beta']:.3g} "
-              f"epsilon={point['epsilon']:.3g} loss={point['loss']:.5f}", flush=True)
+              f"epsilon={point['epsilon']:.3g} loss={point['loss']:.5f} (profile: {point['axes']})", flush=True)
         out = run_point(point, setup)
         for key in parts:
             parts[key].append(out[key])

@@ -88,7 +88,7 @@ and `results/`, so if running manually, the order below must be preserved:
 pytest tests/ -v
 ```
 
-196 tests, one file per `src/` module.
+197 tests, one file per `src/` module.
 
 ## Project structure
 
@@ -123,9 +123,10 @@ matching the theoretical ceiling. All three operators have spectral radius
 slightly above 1 (1.014-1.022).
 
 **P8 — real-data forecasting.** No EDMD variant beats persistence on the
-real holdout weeks. One week ahead they are indistinguishable at every
-calibration point; at 3-4 weeks the small gap (at most 0.0064 RMSE, about a
-tenth of the sampling error) changes sign along the calibration ridge.
+real holdout weeks. One week ahead they are indistinguishable at all nine
+near-optimal calibration points; at 3-4 weeks EDMD is tied or slightly worse
+in all but 2 of 54 cases (gaps at most 0.0092 RMSE, small next to the 0.057
+sampling error).
 
 **P9 — superspreader validation.** Degree centrality matches the 50%-cut
 ground truth best (Spearman rho = 0.94, exact p = 0.017), but that ground
@@ -140,11 +141,12 @@ under 5% of colonized person-days.
 
 **P11 — robustness.** The 50%-cut ward ranking is stable across seed,
 replicate count, calibration point, network window and population; the
-Koopman eigenmode ward shares are not (E8). E9 reruns P4-P10 at all five
-near-optimal calibration points: degree rho = 0.94 and "degree targeting
-beats random/whole-hospital" (20 of 20) hold everywhere, while Koopman
-scores swing between -0.77 and 0.83 and beat degree targeting in only 1 of
-60 comparisons.
+Koopman eigenmode ward shares are not (E8). E9 reruns P4-P10 at all nine
+near-optimal calibration points (gamma, beta and epsilon profiles): degree
+stays significant against the 50%-cut ground truth (rho 0.89-0.94) and
+"degree targeting beats random/whole-hospital" holds in 36 of 36
+comparisons, while Koopman scores swing between -0.77 and 0.94 and beat
+degree targeting in only 2 of 108 comparisons.
 
 ## Limitations
 

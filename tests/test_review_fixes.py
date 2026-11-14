@@ -215,10 +215,31 @@ def test_ridge_points_picks_profile_minimum_within_tolerance():
         "epsilon": [0, 0, 0, 0, 0, 0],
         "loss":    [1.00, 1.20, 1.10, 1.03, 2.00, 1.90],
     })
-    pts = ridge_points(grid, tol=0.05)
+    pts = ridge_points(grid, tol=0.05, axes=("gamma",))
     # gamma .1 -> beta 1 (loss 1.00); gamma .2 -> beta 2 (1.03 <= 1.05); gamma .3 excluded (1.90)
     assert pts["gamma"].tolist() == [.1, .2]
     assert pts["beta"].tolist() == [1, 2]
+    # beta profile: beta 1 -> (gamma .1, loss 1.00), beta 2 -> (gamma .2, loss 1.03). Both are
+    # already gamma-profile points, so the union over both axes adds nothing new and each point
+    # records both profiles.
+    both = ridge_points(grid, tol=0.05, axes=("gamma", "beta"))
+    assert both["gamma"].tolist() == [.1, .2]
+    assert both["axes"].tolist() == ["gamma+beta", "gamma+beta"]
+
+
+def test_ridge_points_union_adds_points_from_other_axes():
+    from src.ridge_sensitivity import ridge_points
+
+    grid = pd.DataFrame({
+        "beta":    [1, 1, 2, 2],
+        "gamma":   [.1, .2, .1, .2],
+        "epsilon": [0, 0, 0, 0],
+        "loss":    [1.00, 1.02, 1.04, 1.50],
+    })
+    # gamma profile: .1 -> (b1, 1.00), .2 -> (b1, 1.02); beta profile: 1 -> (g.1), 2 -> (g.1, 1.04)
+    pts = ridge_points(grid, tol=0.05, axes=("gamma", "beta"))
+    assert sorted(zip(pts["beta"], pts["gamma"])) == [(1, .1), (1, .2), (2, .1)]
+    assert dict(zip(zip(pts["beta"], pts["gamma"]), pts["axes"]))[(2, .1)] == "beta"
 
 
 def test_e9_summary_rows_counts_verdicts():

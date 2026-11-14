@@ -133,8 +133,9 @@ def e9_summary_rows(points, e9):
     """One summary row per E9 question, each giving the range over ridge
     points (min..max) so the reader sees how much the answer moves."""
     rows = []
-    g_lo, g_hi = points["gamma"].min(), points["gamma"].max()
-    span = f"{len(points)} gamma points {g_lo:.3g}..{g_hi:.3g}"
+    span = (f"{len(points)} points; gamma {points['gamma'].min():.3g}..{points['gamma'].max():.3g}, "
+            f"beta {points['beta'].min():.3g}..{points['beta'].max():.3g}, "
+            f"epsilon {points['epsilon'].min():.3g}..{points['epsilon'].max():.3g}")
     m = e9["params"]
     rows.append({"experiment": "E9", "description": "ridge: EDMD spectral radius (all dictionaries)",
                  "stability_metric": "min..max", "value": m["spectral_radius"].max(),
@@ -175,30 +176,42 @@ def _e9_plot(e9):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
+    # Points differ in gamma, beta or epsilon, so the x axis is the point
+    # itself (sorted by gamma, then beta, then epsilon), labelled with its
+    # parameters. Lines join points only as a visual aid.
+    keys = ["gamma", "beta", "epsilon"]
+    pts = e9["params"][keys].drop_duplicates().sort_values(keys).reset_index(drop=True)
+    pos = {tuple(r): i for i, r in enumerate(pts.itertuples(index=False))}
+    labels = [f"g {r.gamma:.1e}\nb {r.beta:.1e}\ne {r.epsilon:.1e}" for r in pts.itertuples(index=False)]
+
+    def xs(df):
+        return [pos[tuple(r)] for r in df[keys].itertuples(index=False)]
+
+    fig, axes = plt.subplots(3, 1, figsize=(12, 13))
     f = e9["forecast"]
     for name, g in f[f["h"] == 4].groupby("model"):
-        g = g.sort_values("gamma")
-        axes[0].errorbar(g["gamma"], g["rmse_diff"], yerr=[g["rmse_diff"] - g["ci_low"], g["ci_high"] - g["rmse_diff"]],
+        g = g.sort_values(keys)
+        axes[0].errorbar(xs(g), g["rmse_diff"], yerr=[g["rmse_diff"] - g["ci_low"], g["ci_high"] - g["rmse_diff"]],
                          marker="o", capsize=3, label=name)
     axes[0].axhline(0, color="gray", linestyle=":")
-    axes[0].set_title("real holdout RMSE - persistence, h=4\n(> 0 = worse than persistence)", fontsize=10)
+    axes[0].set_title("real holdout RMSE - persistence, h=4 (> 0 = worse than persistence)", fontsize=10)
+    axes[0].legend(fontsize=8)
     r = e9["ranking"]
     for ax, gt in zip(axes[1:], ["pct50", "equal_hours"]):
         for cand in ["degree_centrality", "eigenvector_centrality", "koopman_D1", "koopman_D2", "koopman_D3",
                      "koopman_influence_D3"]:
-            g = r[(r["ground_truth"] == gt) & (r["candidate"] == cand)].sort_values("gamma")
-            ax.plot(g["gamma"], g["spearman_rho"], marker="o", label=cand)
+            g = r[(r["ground_truth"] == gt) & (r["candidate"] == cand)].sort_values(keys)
+            ax.plot(xs(g), g["spearman_rho"], marker="o", label=cand)
         ax.axhline(0, color="gray", linestyle=":")
         ax.set_ylim(-1.05, 1.05)
         ax.set_title(f"Spearman rho vs ground truth {'A (50% cut)' if gt == 'pct50' else 'B (equal hours)'}",
                      fontsize=10)
+        ax.legend(fontsize=8, loc="lower left", ncol=3)
     for ax in axes:
-        ax.set_xscale("log")
-        ax.set_xlabel("gamma at the ridge point (per day)")
-    axes[0].legend(fontsize=7)
-    axes[2].legend(fontsize=7, loc="lower left")
-    fig.suptitle("E9: how results move along the calibration ridge (all points within 5% of the best loss)")
+        ax.set_xticks(range(len(pts)))
+        ax.set_xticklabels(labels, fontsize=7)
+    axes[-1].set_xlabel("near-optimal calibration point (g = gamma/day, b = beta/contact-hour, e = epsilon/day)")
+    fig.suptitle("E9: how results move across the near-optimal calibration points (loss within 5% of the best)")
     fig.tight_layout()
     fig.savefig(config.RESULTS_FIGURES_DIR / "p11_e9_ridge_sensitivity.png", dpi=150)
     plt.close(fig)

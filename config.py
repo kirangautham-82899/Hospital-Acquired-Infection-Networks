@@ -71,7 +71,13 @@ P8_BOOTSTRAP_N = 10000  # block bootstrap resamples (blocks = forecast start wee
 # then matches it almost by construction. The second ground truth removes
 # the SAME number of contact-hours from every ward: this fraction of the
 # smallest ward's touching contact volume.
-P9_EQUAL_HOURS_FRACTION_OF_MIN = 0.5
+# Third review: 0.5 removed only 5% of Menard 1's volume and gave drops of
+# 20-44 person-days with overlapping CIs (too little signal). 0.9 removes
+# 2,884 contact-hours per ward (Other keeps 10% of its contacts, Menard 1
+# loses 9%), and more replicates narrow the CIs. The 0.5 results are kept
+# in research_log.md.
+P9_EQUAL_HOURS_FRACTION_OF_MIN = 0.9
+P9_EQUAL_HOURS_N_REPLICATES = 400
 
 # --- P10: intervention simulation ---
 INTERVENTION_K_VALUES = [1, 2]  # number of targeted wards
@@ -95,3 +101,6 @@ ROBUSTNESS_LAMBDA_MULTIPLIERS = [0.1, 10.0]  # E2: vs each dictionary's P6-selec
 # these (k, R) cells to keep the cost down: the smallest-k mid cut and the
 # largest budget.
 E9_INTERVENTION_CELLS = [(1, 0.50), (2, 0.75)]
+# Third review: also walk the beta and epsilon profiles, not only gamma,
+# so beta's factor-4 uncertainty is propagated too.
+E9_RIDGE_AXES = ("gamma", "beta", "epsilon")
