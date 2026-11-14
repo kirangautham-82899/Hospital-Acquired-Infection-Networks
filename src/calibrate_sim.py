@@ -195,3 +195,37 @@ def is_on_edge(best_row, beta_grid, gamma_grid, epsilon_grid):
         elif np.isclose(value, max(grid)):
             edges[name] = "high"
     return edges
+
+
+def widened_grid(grid, direction, factor=None):
+    """Extend a geometric grid by `factor` in one direction ('low' divides
+    the minimum, 'high' multiplies the maximum), keeping the same number
+    of points. Used when the best calibration point sits on that edge."""
+    factor = config.CALIBRATION_WIDEN_FACTOR if factor is None else factor
+    grid = np.asarray(grid, dtype=float)
+    if direction == "low":
+        new_min, new_max = grid.min() / factor, grid.max()
+    elif direction == "high":
+        new_min, new_max = grid.min(), grid.max() * factor
+    else:
+        raise ValueError(f"direction must be 'low' or 'high', got {direction!r}")
+    return list(np.geomspace(new_min, new_max, len(grid)))
+
+
+def profile_loss(table, param):
+    """Profile loss for one parameter: for each distinct value of `param`
+    in the grid table, the minimum loss over all other parameters.
+    Returns a DataFrame [param, profile_loss] sorted by param value. A
+    flat profile means the data cannot pin that parameter down."""
+    prof = table.groupby(param)["loss"].min().reset_index().rename(columns={"loss": "profile_loss"})
+    return prof.sort_values(param).reset_index(drop=True)
+
+
+def near_optimal_interval(table, param, tol=None):
+    """(min, max) of `param` over grid points whose loss is within `tol`
+    (a fraction) of the best loss: a grid-resolution identifiability
+    interval. A wide interval means the parameter is weakly identified."""
+    tol = config.CALIBRATION_NEAR_OPTIMAL_TOL if tol is None else tol
+    best = table["loss"].min()
+    near = table[table["loss"] <= best * (1.0 + tol)]
+    return float(near[param].min()), float(near[param].max())

@@ -7,6 +7,8 @@ Writes:
   results/tables/p8_baseline_params.csv     (fitted network-exposure/ward-SIS coefficients)
   results/tables/p8_metrics.csv             (every model x period x h x ward, raw+clipped, skill)
   results/tables/p8_metrics_summary.csv     (overall-ward, holdout-period summary for quick reading)
+  results/tables/p8_significance_vs_persistence.csv  (paired block-bootstrap CI of RMSE diff vs persistence)
+  results/tables/p8_noise_floor.csv         (RMS binomial sampling SE of the scored targets)
   results/figures/p8_rmse_by_horizon.png
   results/figures/p8_predicted_vs_actual_holdout.png
 
@@ -33,7 +35,12 @@ from src.forecast import (
     load_edmd_model,
     persistence_forecast_real,
 )
-from src.metrics import add_skill_vs_persistence, compute_metrics_from_long
+from src.metrics import (
+    add_skill_vs_persistence,
+    binomial_noise_floor,
+    block_bootstrap_rmse_diff,
+    compute_metrics_from_long,
+)
 
 
 def load_w_all():
@@ -73,6 +80,31 @@ def forecast_baseline_iteratively(predict_fn, weekly_states, states_real, groups
                 }
             )
     return records
+
+
+def forecast_significance(long_df, states_real, period="holdout"):
+    """(a) For every model and horizon on `period`: paired block-bootstrap
+    CI of its RMSE minus persistence's RMSE on the same scored cells
+    (src.metrics.block_bootstrap_rmse_diff). Only 5 start weeks feed each
+    holdout horizon, so the bootstrap CIs are rough. (b) The RMS binomial
+    sampling SE of the observed targets (src.metrics.binomial_noise_floor),
+    a yardstick for how large an RMSE difference would be meaningful."""
+    sub = long_df[long_df["period"] == period]
+    sig_rows, noise_rows = [], []
+    lookup = states_real.set_index(["week", "group"])
+    for h, g in sub.groupby("h"):
+        base = g[g["model"] == "persistence"]
+        for model in sorted(m for m in g["model"].unique() if m != "persistence"):
+            res = block_bootstrap_rmse_diff(g[g["model"] == model], base)
+            sig_rows.append({"period": period, "h": h, "model": model, **res})
+        cells = base[["landing_week", "ward"]].drop_duplicates()
+        obs = lookup.loc[list(zip(cells["landing_week"], cells["ward"]))]
+        noise_rows.append({
+            "period": period, "h": h, "n_cells": len(cells),
+            "noise_floor_rmse": binomial_noise_floor(obs["prevalence"], obs["n_tested"]),
+            "persistence_rmse": float(np.sqrt(((base["pred"] - base["actual"]) ** 2).mean())),
+        })
+    return pd.DataFrame(sig_rows), pd.DataFrame(noise_rows)
 
 
 def build():
@@ -149,6 +181,15 @@ def build():
 
     print("\nHOLDOUT period, overall (all wards), by horizon:")
     print(summary[["model", "h", "n", "rmse", "rmse_clipped", "skill_vs_persistence"]].to_string(index=False))
+
+    significance, noise = forecast_significance(long_df, states_real)
+    significance.to_csv(config.RESULTS_TABLES_DIR / "p8_significance_vs_persistence.csv", index=False)
+    noise.to_csv(config.RESULTS_TABLES_DIR / "p8_noise_floor.csv", index=False)
+    print("\nRMS binomial sampling SE of the observed holdout targets (noise_floor_rmse), by horizon:")
+    print(noise.to_string(index=False))
+    print("\nHoldout RMSE difference vs persistence (model - persistence; negative = model better),")
+    print(f"block bootstrap over forecast start weeks, {config.P8_BOOTSTRAP_N} resamples:")
+    print(significance.to_string(index=False))
 
     _rmse_by_horizon_plot(metrics)
     _predicted_vs_actual_plot(long_df)

@@ -183,8 +183,8 @@ def e3_replicate_count_sensitivity(setup, n_replicates):
 
 def e4_calibration_ridge_point(setup):
     """P4 found the best-fit (beta, gamma) sits on a wide, flat loss
-    ridge (16 of 320 grid points within 10% of the best loss; gamma still
-    on the widened grid's edge). Pick a DIFFERENT point on that ridge
+    ridge (see p4_identifiability.csv / p4_profile_*.csv for the current
+    numbers). Pick a DIFFERENT point on that ridge
     (largest gamma among the near-best points, to get a meaningfully
     different point, not a numerically nearby duplicate) and rerun P9's
     ground-truth experiment there. Tests whether P9/P10's conclusions

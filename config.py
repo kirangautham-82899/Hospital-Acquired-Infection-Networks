@@ -28,12 +28,21 @@ N_WEEKS = 17  # weeks 0-16, Monday-anchored (src/network.py assign_week)
 CALIBRATION_WEEKS = list(range(0, 12))  # weeks 0-11
 HOLDOUT_WEEKS = list(range(12, 17))  # weeks 12-16, sanity check only, never tuned on
 
-# Starting grid (rough estimates per research_log.md, not fit from data;
-# widened automatically if the best point lands on an edge).
-BETA_GRID = list(np.geomspace(1e-3, 5e-2, 8))  # per contact-hour
-GAMMA_GRID = list(np.geomspace(0.005, 0.1, 8))  # per day
+# Starting grid, widened after review (Nov 14): the first grid (beta from
+# 1e-3, gamma from 5e-3, one widening round) left gamma on its lower edge,
+# so the reported "optimum" was only a grid boundary. The grid now spans
+# 3 orders of magnitude in beta and gamma, and widening repeats (up to
+# CALIBRATION_MAX_WIDEN_ROUNDS) until the best point is interior.
+BETA_GRID = list(np.geomspace(1e-4, 5e-2, 10))  # per contact-hour
+GAMMA_GRID = list(np.geomspace(1e-4, 0.1, 10))  # per day
 EPSILON_GRID = list(np.geomspace(1e-4, 5e-3, 5))  # per day
 N_CALIBRATION_REPLICATES = 20  # same seeds at every grid point (common random numbers)
+CALIBRATION_MAX_WIDEN_ROUNDS = 3  # repeat 3x widening of an edge axis at most this many times
+CALIBRATION_WIDEN_FACTOR = 3.0
+# Near-optimal set: grid points whose loss is within this fraction of the
+# best loss. Used to report an identifiability interval per parameter
+# (profile loss), instead of a single point estimate on a flat ridge.
+CALIBRATION_NEAR_OPTIMAL_TOL = 0.05
 
 N_TRAINING_TRAJECTORIES = 300
 TRAJECTORY_SCENARIOS = ["endemic", "outbreak"]  # split 50/50
@@ -48,13 +57,29 @@ EDMD_LAMBDA_GRID = list(np.geomspace(1e-6, 1e3, 20))
 EDMD_MAX_HORIZON = 4  # lambda selected on mean RMSE over h=1..4, not just h=1
 EDMD_DICTIONARIES = ["D1", "D2", "D3"]
 
+# --- P7 add-on (Nov 14 review): Koopman influence score, src/influence.py ---
+KOOPMAN_INFLUENCE_N_SEED = 3  # extra colonized people seeded in one ward (matches OUTBREAK_SEED_RANGE max)
+KOOPMAN_INFLUENCE_HORIZON = N_WEEKS - 1  # weeks rolled forward (16, the length of the real window)
+
+# --- P8 add-on (Nov 14 review): forecast significance ---
+CI_LEVEL = 0.95
+P8_BOOTSTRAP_N = 10000  # block bootstrap resamples (blocks = forecast start weeks)
+
+# --- P9 add-on (Nov 14 review): non-circular ground truth ---
+# The locked ground truth (decision 14) cuts each ward's contacts by 50%,
+# so a ward with more contact-hours loses more hours; degree centrality
+# then matches it almost by construction. The second ground truth removes
+# the SAME number of contact-hours from every ward: this fraction of the
+# smallest ward's touching contact volume.
+P9_EQUAL_HOURS_FRACTION_OF_MIN = 0.5
+
 # --- P10: intervention simulation ---
 INTERVENTION_K_VALUES = [1, 2]  # number of targeted wards
 INTERVENTION_REDUCTIONS = [0.25, 0.50, 0.75]  # per-targeted-ward contact reduction
 INTERVENTION_N_REPLICATES = 200  # common random numbers across every strategy/config
 INTERVENTION_TARGETED_STRATEGIES = ["random", "degree_targeted"] + [
-    f"koopman_targeted_{d}" for d in EDMD_DICTIONARIES
-]
+    f"koopman_targeted_{d}" for d in EDMD_DICTIONARIES  # dominant-mode share (original P7 score)
+] + [f"koopman_influence_targeted_{d}" for d in EDMD_DICTIONARIES]  # influence score (Nov 14 review)
 
 # --- P11: robustness experiments E1-E8 ---
 # CLAUDE.md names this phase "robustness experiments E1-E8" without

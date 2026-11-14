@@ -118,13 +118,40 @@ def run_person_days_replicates(people, index, day_list, edge_arrays_by_day, beta
     return totals
 
 
+def ward_touching_seconds(edges, admission, groups):
+    """Total contact-seconds of edges touching each ward (either endpoint
+    in the ward; a within-ward edge counts once) -- exactly the volume a
+    scale_ward_edges cut acts on."""
+    ward_of = person_ward_map(admission)
+    u_ward = edges["u"].map(ward_of)
+    v_ward = edges["v"].map(ward_of)
+    return pd.Series(
+        {g: float(edges.loc[(u_ward == g) | (v_ward == g), "seconds"].sum()) for g in groups}
+    )
+
+
+def equal_hours_scales(touching_seconds, fraction_of_min):
+    """Per-ward edge scale factors that remove the SAME absolute number of
+    contact-seconds from every ward: removed = fraction_of_min x the
+    smallest ward's touching volume. Returns {ward: scale in (0, 1]}.
+    Unlike a fixed-percentage cut, this does not remove more contact from
+    high-volume wards, so the resulting drop is not proportional to
+    degree by construction."""
+    removed = fraction_of_min * float(touching_seconds.min())
+    return {w: 1.0 - removed / float(v) for w, v in touching_seconds.items()}
+
+
 def superspreader_experiment(people, index, day_list, edges, admission, beta, gamma, epsilon,
-                              pre_window_last_status, groups, n_replicates=100, cut_fraction=0.5, base_seed=None):
+                              pre_window_last_status, groups, n_replicates=100, cut_fraction=0.5, base_seed=None,
+                              ward_scales=None):
     """For each ward in `groups`: run n_replicates baseline and
-    intervention (that ward's contacts cut by cut_fraction) simulations
-    with COMMON RANDOM NUMBERS. Returns (summary DataFrame, per-replicate
-    dict {'baseline': array, ward: array, ...}) so callers can also check
-    the paired per-replicate drop distribution, not just its mean."""
+    intervention (that ward's contacts cut by cut_fraction, or scaled by
+    ward_scales[ward] when given) simulations with COMMON RANDOM NUMBERS.
+    Returns (summary DataFrame, per-replicate dict {'baseline': array,
+    ward: array, ...}) so callers can also check the paired per-replicate
+    drop distribution, not just its mean. The summary includes a paired
+    t-based confidence interval for the mean drop."""
+    from src.metrics import paired_mean_ci
     seed_pairs = replicate_seed_pairs(n_replicates, base_seed=base_seed)
 
     baseline_edge_arrays = daily_edge_arrays(edges, index)
@@ -136,7 +163,8 @@ def superspreader_experiment(people, index, day_list, edges, admission, beta, ga
     rows = []
     per_replicate = {"baseline": baseline_totals}
     for ward in groups:
-        scaled_edges = scale_ward_edges(edges, admission, ward, scale=1.0 - cut_fraction)
+        scale = (1.0 - cut_fraction) if ward_scales is None else ward_scales[ward]
+        scaled_edges = scale_ward_edges(edges, admission, ward, scale=scale)
         scaled_edge_arrays = daily_edge_arrays(scaled_edges, index)
         intervention_totals = run_person_days_replicates(
             people, index, day_list, scaled_edge_arrays, beta, gamma, epsilon,
@@ -148,13 +176,17 @@ def superspreader_experiment(people, index, day_list, edges, admission, beta, ga
         drop_fraction = np.divide(
             drop, baseline_totals, out=np.full_like(drop, np.nan), where=baseline_totals != 0
         )
+        ci = paired_mean_ci(drop)
         rows.append(
             {
                 "ward": ward,
+                "edge_scale": scale,
                 "baseline_mean_person_days": baseline_totals.mean(),
                 "intervention_mean_person_days": intervention_totals.mean(),
                 "drop_person_days_mean": drop.mean(),
                 "drop_person_days_std": drop.std(ddof=1),
+                "drop_ci_low": ci["ci_low"],
+                "drop_ci_high": ci["ci_high"],
                 "drop_fraction_mean": float(np.nanmean(drop_fraction)),
             }
         )

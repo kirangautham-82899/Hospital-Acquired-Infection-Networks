@@ -10,6 +10,12 @@ Writes:
   results/tables/p7_dominant_mode_ward_ranking.csv  (cross-dictionary comparison)
   results/figures/p7_eigenvalue_spectrum_<dict>.png (complex plane, unit circle)
   results/figures/p7_dominant_mode_wards_<dict>.png (ward bar chart)
+  results/tables/p7_koopman_influence.csv          (seeded-perturbation influence per ward, see src/influence.py)
+
+The dominant mode's ward shares describe WHERE the persistent pattern
+sits (its long-run drift or equilibrium pattern), not which ward
+drives spread. The influence score (added after the Nov 14 review) is the
+Koopman-based answer to the second question; P9/P10 test both.
 """
 import numpy as np
 import pandas as pd
@@ -92,6 +98,32 @@ def _dominant_ward_plot(name, df, dominant_idx, groups, path):
     plt.close(fig)
 
 
+def build_influence_table():
+    """Koopman influence score (src/influence.py) for every dictionary,
+    from the real calibration-weeks mean state."""
+    from src.forecast import load_edmd_model
+    from src.influence import koopman_influence_scores, ward_sizes_in_network
+    from src.load import load_admission, load_contacts
+
+    groups = config.WARD_GROUPS
+    states_real = pd.read_csv(config.RESULTS_TABLES_DIR / "p3_states_real.csv")
+    calib = states_real[states_real["week"].isin(config.CALIBRATION_WEEKS)]
+    x_base = calib.groupby("group")["prevalence"].mean().reindex(groups).to_numpy()
+    admission = load_admission(config.ADMISSION_CSV)
+    contacts = load_contacts(config.CONTACTS_CSV)
+    sizes = ward_sizes_in_network(admission, set(contacts["from"]) | set(contacts["to"]), groups)
+    W = pd.read_csv(config.RESULTS_TABLES_DIR / "p2_ward_matrix_W_all.csv", index_col=0).loc[groups, groups].to_numpy()
+
+    frames = []
+    for name in config.EDMD_DICTIONARIES:
+        model = load_edmd_model(name)
+        df = koopman_influence_scores(model, name, x_base, sizes, groups, W=W)
+        df.insert(0, "dictionary", name)
+        df["ward_size"] = sizes
+        frames.append(df)
+    return pd.concat(frames, ignore_index=True)
+
+
 def build():
     config.RESULTS_TABLES_DIR.mkdir(parents=True, exist_ok=True)
     config.RESULTS_FIGURES_DIR.mkdir(parents=True, exist_ok=True)
@@ -137,6 +169,13 @@ def build():
 
     ranking_df = pd.DataFrame(ranking_rows)
     ranking_df.to_csv(config.RESULTS_TABLES_DIR / "p7_dominant_mode_ward_ranking.csv", index=False)
+
+    influence_df = build_influence_table()
+    influence_df.to_csv(config.RESULTS_TABLES_DIR / "p7_koopman_influence.csv", index=False)
+    print(f"\nKoopman influence (extra colonized person-weeks over {config.KOOPMAN_INFLUENCE_HORIZON} weeks "
+          f"after seeding {config.KOOPMAN_INFLUENCE_N_SEED} people in a ward):")
+    print(influence_df.pivot(index="ward", columns="dictionary", values="influence_total")
+          .reindex(config.WARD_GROUPS).round(2).to_string())
 
     print("\nCross-dictionary agreement on top ward (by dominant-mode share):")
     for name in config.EDMD_DICTIONARIES:

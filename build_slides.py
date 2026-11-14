@@ -31,8 +31,9 @@ def add_title_slide(prs):
     tf2 = sub.text_frame
     tf2.word_wrap = True
     for text, size in [
+        ("Kiran Gautham", 20),
         ("CMDS Course Project · M.Tech Data Science · Amrita Vishwa Vidyapeetham", 18),
-        ("Topic P30 · First review: October 6, 2026", 16),
+        ("Topic P30 · First review: October 6, 2026 · Revised November 14, 2026", 16),
     ]:
         p = tf2.add_paragraph() if tf2.paragraphs[0].text else tf2.paragraphs[0]
         p.text = text
@@ -186,10 +187,10 @@ def build():
         prs, "Research Questions",
         [
             "RQ1: Does lifting ward-level MRSA prevalence into a Koopman/EDMD",
-            ("framework forecast outbreak trajectories better than simple baselines?", 1),
-            "RQ2: Do the resulting Koopman eigenmodes identify “superspreader”",
+            ("framework forecast better than simple baselines?", 1),
+            "RQ2: Do Koopman-based ward scores identify “superspreader”",
             ("wards better than plain network centrality?", 1),
-            "Answered honestly against a SIMULATED GROUND TRUTH, not just in-sample fit",
+            "Answered against SIMULATED GROUND TRUTHS and real holdout data, not in-sample fit",
         ],
     )
 
@@ -223,25 +224,26 @@ def build():
             "P1 Data audit  →  P2 Contact network + ward matrix W",
             "P3 Real weekly prevalence  →  P4 Individual-level SIS simulation + calibration",
             "P5 EDMD dictionaries (D1/D2/D3)  →  P6 Ridge-regularized EDMD fit",
-            "P7 Eigenmode analysis  →  P8 Real-data forecasting validation",
-            "P9 Superspreader risk score vs. centrality  →  P10 Intervention simulation",
+            "P7 Eigenmodes + Koopman influence  →  P8 Real-data forecasting validation",
+            "P9 Superspreader score vs. centrality  →  P10 Intervention simulation",
             "P11 Robustness experiments E1–E8",
-            "179 automated tests throughout; every design decision logged and verified",
+            "194 automated tests; every decision and the Nov 14 review fixes logged",
         ],
     )
 
-    add_bullet_slide(
-        prs, "Individual-Level SIS Simulation (P4)",
-        [
-            "Daily stochastic SIS on the 589-person contact network",
-            "P(transmit) = 1 − exp(−β·contact hours with infected neighbors)",
-            "Verified analytically: matched a closed-form solution over 20,000 replicates",
-            "Calibrated to real weekly prevalence (weeks 0–11), 320-point grid search",
-            "FINDING: calibration sits on a wide, weakly-identified loss ridge",
-            ("— only ~16 real weekly snapshots to calibrate against", 1),
-            "300 simulated training trajectories generated for EDMD fitting",
+    add_image_slide(
+        prs, "SIS Simulation & Calibration (P4)",
+        f"{FIG}/p4_profile_loss.png",
+        bullets=[
+            "Daily SIS on 589 people: P(transmit) = 1 − exp(−β·contact hours)",
+            "500-point grid, calibration weeks 0–11 only",
+            "Best: β=7.9×10⁻⁴/hr, γ=2.2×10⁻⁴/day, ε=2.7×10⁻⁴/day (interior)",
+            "FINDING: γ is bounded only from above — every γ from 10⁻⁴ to "
+            "2×10⁻³/day is within 5% of the best loss",
+            "So the simulator has almost no decolonization: simulated "
+            "prevalence drifts up, real prevalence fell in weeks 13–16",
         ],
-        note="Best fit: β=6.8×10⁻⁴/hr, γ=1.7×10⁻³/day — 16 of 320 grid points within 10% of best loss",
+        caption="Figure: profile loss per parameter (flat = weakly identified).",
     )
 
     add_bullet_slide(
@@ -264,7 +266,7 @@ def build():
             "CONFIRMED EMPIRICALLY: fitted D3 operator has rank(K) = 19 exactly",
             "D1 (rank 7/7) and D2 (rank 28/28) are both full rank",
             "Consequence: D3 tests whether a contact-structured PRIOR helps —",
-            ("never “injects network information,” since it structurally cannot", 1),
+            ("it structurally cannot add network information beyond D2", 1),
         ],
     )
 
@@ -273,151 +275,140 @@ def build():
         [
             "Ridge regression, written from scratch in NumPy (no external Koopman library)",
             "Constant feature excluded from scaling AND the ridge penalty",
-            "λ selected on validation split, mean RMSE over forecast horizons 1–4",
-            "HONEST RESULT: D1, D2, D3 perform almost identically",
-            ("Test h=1 RMSE: D1=0.00748, D2=0.00758, D3=0.00747", 1),
-            ("All beat persistence by 12–13% at h=1, growing to 25–27% by h=4", 1),
-            "D3 edges out D2 very slightly, despite having less effective capacity",
+            "λ selected on validation split, mean RMSE over horizons 1–4",
+            "On simulated test trajectories D1, D2, D3 are almost identical:",
+            ("h=1 RMSE 0.00519 / 0.00522 / 0.00516 vs persistence 0.00611", 1),
+            ("15% better than persistence at h=1, 26–28% at h=4", 1),
+            "Spectral radius slightly above 1 for all three (1.014–1.022):",
+            ("the operators learned the simulator's slow upward drift", 1),
         ],
     )
 
     add_image_slide(
-        prs, "Eigenmode Analysis (P7): a Disagreement Worth Tracking",
+        prs, "Eigenmodes and Koopman Influence (P7)",
         f"{FIG}/p7_eigenvalue_spectrum_D3.png",
         bullets=[
-            "Dominant (most persistent) mode's top ward:",
-            "D1 says Menard 1 (45.2% share)",
-            "D2 and D3 agree: Sorrel 1 (~42% share)",
-            "D3's 6 spurious null-space eigenvalues (from the proven rank "
-            "deficiency) sit near the origin, cleanly separated from the "
-            "19 real modes near |λ|=1",
-            "This disagreement is NOT resolved from eigenmodes alone — "
-            "tested next against simulated ground truth",
+            "Dominant-mode top ward: D1 Menard 1, D2 Sorrel 2, D3 Menard 1",
+            "A mode's ward shares show WHERE the persistent pattern sits, "
+            "not which ward DRIVES spread",
+            "Added after review: influence score = extra colonized "
+            "person-weeks K predicts after seeding 3 people in a ward",
+            "Influence puts the two Menard wards on top for all three dictionaries",
         ],
         caption="Figure: D3's eigenvalue spectrum — real modes (blue) vs. spurious null-space modes (red).",
     )
 
-    add_bullet_slide(
-        prs, "Real-Data Forecasting Validation (P8)",
+    add_table_slide(
+        prs, "Real-Data Forecasting (P8): RMSE Minus Persistence",
+        ["Model", "h=1", "h=3", "h=4"],
         [
-            "First time the fitted K touches real data (deliberately held back until now)",
-            "New baselines built: network-exposure linear model, ward-level SIS model",
-            "HONEST RESULT on the holdout period (weeks 12–16):",
-            ("D1/D2/D3 statistically indistinguishable from persistence at h=1", 1),
-            ("historical_mean overtakes everything by h=3–4 (skill ≈0.20)", 1),
-            "Plausible cause: K trained on simulated trajectories sitting on P4's",
-            ("weakly-identified calibration ridge — may not transfer a strong edge", 1),
+            ["D1", "+0.0006 [−0.0005, +0.0014]", "+0.0033 [+0.0005, +0.0049]", "+0.0053 [+0.0007, +0.0079]"],
+            ["D2", "+0.0005 [−0.0005, +0.0014]", "+0.0029 [+0.0000, +0.0048]", "+0.0044 [−0.0004, +0.0068]"],
+            ["D3", "+0.0008 [−0.0004, +0.0018]", "+0.0037 [+0.0009, +0.0054]", "+0.0058 [+0.0003, +0.0088]"],
+            ["historical mean", "+0.0228 [+0.0110, +0.0384]", "−0.0173 [−0.0427, +0.0078]", "−0.0176 [−0.0402, +0.0037]"],
         ],
+        note="Holdout weeks 12–16, block-bootstrap 95% CIs (5 start weeks, rough). Positive = worse than persistence.\n"
+             "No EDMD variant beats persistence; at 3–4 weeks they are slightly but measurably worse.",
     )
 
-    add_section_slide(prs, "The Central Question:\nKoopman Eigenmodes vs. Simple Centrality")
+    add_section_slide(prs, "The Central Question:\nKoopman Scores vs. Simple Centrality")
 
     add_image_slide(
-        prs, "Simulated Superspreader Ground Truth (P9)",
+        prs, "Two Simulated Ground Truths (P9)",
         f"{FIG}/p9_ground_truth_bar.png",
         bullets=[
-            "Ground truth: cut each ward's contacts 50%, measure the drop "
-            "in colonized person-days (100 replicates, common random "
-            "numbers, paired comparison)",
-            "Ranking: Menard 1 > Sorrel 1 > Menard 2 > Sorrel 2 > Sorrel 0 > Other",
+            "A: cut each ward's contacts 50% (locked design)",
+            "Caveat: A removes more hours from busy wards, so it rewards "
+            "contact volume (= degree) by construction",
+            "B (added): remove the SAME 1,602 contact-hours from every ward",
+            "Under B only Sorrel 1 stands out; other wards overlap",
         ],
-        caption="Figure: drop in colonized person-days per ward, error bars = per-replicate std.",
+        caption="Figure: drop in colonized person-days, 100 paired replicates, 95% CIs.",
     )
 
     add_table_slide(
-        prs, "Risk Score vs. Ground Truth: Spearman ρ",
-        ["Candidate", "ρ", "p-value"],
+        prs, "Ward Scores vs. Ground Truth: Spearman ρ (exact p)",
+        ["Candidate", "vs A (50% cut)", "vs B (equal hours)"],
         [
-            ["degree_centrality", "0.943", "0.0048"],
-            ["eigenvector_centrality", "0.714", "0.111"],
-            ["koopman_D2", "0.543", "0.266"],
-            ["koopman_D3", "0.429", "0.397"],
-            ["betweenness_centrality", "0.309", "0.552"],
-            ["koopman_D1", "0.257", "0.623"],
+            ["degree centrality", "0.943 (p=0.017)", "0.257 (p=0.66)"],
+            ["Koopman D3 mode share", "0.829 (p=0.058)", "0.200 (p=0.71)"],
+            ["Koopman D3 influence", "0.771 (p=0.10)", "0.086 (p=0.92)"],
+            ["eigenvector centrality", "0.714 (p=0.14)", "0.600 (p=0.24)"],
+            ["Koopman D1 mode share", "0.600 (p=0.24)", "−0.486 (p=0.36)"],
+            ["Koopman D2 mode share", "−0.371 (p=0.50)", "−0.486 (p=0.36)"],
         ],
-        note="Simple degree centrality (a ward's raw contact volume, no Koopman machinery) predicts the ground\ntruth far better than any Koopman eigenmode score — the only candidate surviving Bonferroni correction.",
+        note="Degree wins A, largely by construction. Under B no candidate ranks the wards reliably (n=6).\n"
+             "Koopman scores also moved with the calibration point (old run: 0.26–0.54 vs A).",
     )
 
     add_image_slide(
-        prs, "The Same Pattern, Visually",
-        f"{FIG}/p9_rank_heatmap.png",
-        bullets=[
-            "ground_truth, degree_centrality, and eigenvector_centrality "
-            "columns look nearly identical",
-            "The three koopman columns look comparatively scrambled",
-            "Nuance: koopman_D1 DOES pick the #1 ward correctly (Menard 1) "
-            "— but has the worst OVERALL rank correlation of the three",
-        ],
-        caption="Figure: ward ranks (1=highest) across all candidates and the ground truth.",
-    )
-
-    add_image_slide(
-        prs, "Intervention Simulation (P10): Targeting Matters",
+        prs, "Intervention Simulation (P10)",
         f"{FIG}/p10_drop_vs_budget.png",
         bullets=[
-            "Equal-budget framework: budget = k × reduction fraction",
-            "Every TARGETED strategy beats BOTH untargeted strategies "
-            "(random, whole-hospital) at every matching budget",
-            "At k=2: koopman_D2/D3 slightly beats degree-targeting — a "
-            "higher overall correlation doesn't guarantee the better k=2 pick",
+            "Equal budget = k × reduction; 200 paired replicates, 95% CIs",
+            "Degree-targeted beats random AND whole-hospital at every budget",
+            "Koopman D2 mode-share targeting is WORSE than random",
+            "Koopman D3 beats degree in 1 of 48 comparisons "
+            "(k=2, 75%: +31 person-days, CI 7–55); ties otherwise",
+            "Best strategy prevents < 5% of colonized person-days",
         ],
-        caption="Figure: drop in colonized person-days vs. budget, by strategy.",
+        caption="Figure: drop vs. budget, one panel per k, 95% paired CIs. Degree and influence D1/D3 pick the same wards, so their lines overlap.",
     )
 
     add_table_slide(
         prs, "Robustness: Experiments E1–E8 (P11)",
         ["#", "Probes", "Result"],
         [
-            ["E1", "Seed sensitivity", "ρ=0.943"],
-            ["E2", "λ sensitivity (0.1×/10×)", "max ratio dev. 3.3%"],
+            ["E1", "Seed sensitivity (ground truth A)", "ρ=0.943"],
+            ["E2", "λ sensitivity (0.1×/10×)", "max ratio dev. 1.6%"],
             ["E3", "Replicate count (30/300)", "ρ=1.000"],
-            ["E4", "Calibration ridge-point", "ρ=1.000"],
+            ["E4", "Calibration ridge point (γ=2.2×10⁻³)", "ρ=1.000"],
             ["E5", "W's time window", "ρ=1.000"],
-            ["E6", "Patients-only population", "ρ≈1.000"],
-            ["E7", "Missing-data handling", "ρ=1.000 (model ranking)"],
-            ["E8", "D3 structural redundancy", "ratio=0.998, same dominant ward"],
+            ["E6", "Patients-only population", "ρ=1.000"],
+            ["E7", "Missing-data handling", "ρ=0.50 (3 near-tied models)"],
+            ["E8", "D3 structural redundancy", "ratio 0.999, dominant ward DIFFERS"],
         ],
-        note="Every major conclusion is stable across seed, replicate count, calibration point, network\ntime-window, population, missing-data handling, and λ choice.",
+        note="Ground truth A's ranking is very stable (driven by Menard 1's contact volume).\n"
+             "Koopman eigenmode ward shares are fragile (E8).",
     )
 
     add_bullet_slide(
         prs, "Discussion",
         [
-            "The Koopman/EDMD machinery works and was built/verified rigorously "
-            "(exact recovery on synthetic systems, closed-form agreement, 179 tests)",
-            "On THIS dataset, it does not outperform simpler alternatives — "
-            "reported honestly, with three concrete, verifiable reasons:",
-            ("(a) SIS calibration sits on a weakly-identified ridge (~16 real snapshots)", 1),
-            ("(b) D3, the “network-aware” dictionary, is PROVABLY no richer than D2", 1),
-            ("(c) raw ward contact volume is a strong, nearly-free predictor", 1),
-            "Targeting still matters enormously, independent of which score is used — "
-            "a practically actionable finding that survives every robustness check",
+            "The EDMD machinery is sound (exact recovery tests, proven D3 redundancy)",
+            "Forecasting: no gain on real data — the closed, no-turnover simulator "
+            "drifts up while real prevalence fell; EDMD inherits that drift",
+            "Ranking: ground truth A mostly measures contact volume; under "
+            "equal hours nothing ranks reliably with 6 wards",
+            "Koopman scores depend on an unidentified decolonization rate",
+            "Practical: concentrate contact reduction on the busiest wards — "
+            "beats random/whole-hospital, but the gain is small (< 5%)",
         ],
     )
 
     add_bullet_slide(
         prs, "Limitations",
         [
-            "About 16 real weekly snapshots only — root cause of the calibration ridge",
-            "Time-invariant K vs. a time-varying contact network",
-            "Only 6 ward groups — rank statistics are inherently weak (n=6)",
-            "No admission/discharge dates, single hospital, single 4-month window",
-            "No transfer records",
+            "About 16 real weekly snapshots — decolonization rate not identified",
+            "Closed population (no admission/discharge dates): cannot reproduce decline",
+            "Ground truths and Koopman scores share the same simulator",
+            "Only 6 ward groups — weak rank statistics; many P10 comparisons",
+            "Time-invariant K vs. a time-varying contact network; no transfer records",
         ],
     )
 
     add_bullet_slide(
         prs, "Conclusion & Future Work",
         [
-            "Built a complete, rigorously-tested pipeline: real network → "
-            "calibrated SIS simulator → EDMD → eigenmodes → validated "
-            "against simulated ground truth",
-            "Honest answer: network-aware Koopman eigenmodes do not beat simple "
-            "degree centrality for THIS dataset — traced to specific, understood causes",
-            "“Some form of targeting beats none” is robust and practically useful",
+            "Complete, tested pipeline: real network → calibrated SIS → EDMD → "
+            "eigenmodes/influence → validated against simulated ground truths",
+            "Koopman/EDMD does not beat persistence on real data, and no Koopman "
+            "score beats contact volume at finding high-impact wards",
+            "Review fixes made two earlier claims weaker and are reported openly",
             "FUTURE WORK:",
-            ("Genuinely time-varying, network-weighted dictionary (week-specific W_t)", 1),
-            ("Larger / multi-site real dataset to better identify the SIS calibration", 1),
+            ("Simulator with patient admission/discharge (turnover)", 1),
+            ("Week-specific network dictionary W_t", 1),
+            ("Larger / multi-site dataset to identify the decolonization rate", 1),
         ],
     )
 

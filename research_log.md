@@ -1069,3 +1069,134 @@ environment-level knob, not project code, and is not worth constraining
 given it changes nothing that is reported. Logged here rather than
 silently reverting so this is documented if the discrepancy is noticed
 again in a future re-run.
+
+## Nov 14: internal review fixes (P4, P7-P11 rerun, report and slides revised)
+
+A reviewer-style pass over the finished project found six problems. Each
+is fixed below; the full pipeline was rerun (python run_all.py, exit 0) and
+REPORT.md, README.md and P30_slides.pptx were revised to match. Several
+earlier conclusions changed; the old numbers are quoted where they changed.
+
+### 1. Calibration optimum was a grid edge (P4)
+Problem: gamma sat on the lower edge of the grid even after one widening,
+so gamma=1.67e-3 was a boundary, not a fit. The first report also called
+the implied carriage "biologically implausible" without a source.
+Fix (config.py, src/calibrate_sim.py, src/build_simulation.py): grids now
+span 1e-4..5e-2 (beta) and 1e-4..0.1 (gamma) with 10 points each (500
+points); widening repeats up to 3 rounds; new outputs p4_profile_{beta,
+gamma,epsilon}.csv, p4_identifiability.csv, p4_profile_loss.png.
+Result: best point interior with no widening needed: beta=7.94e-4,
+gamma=2.15e-4, epsilon=2.66e-4, loss 0.00497 (holdout 0.00890). Profile:
+gamma within 5% of the best loss from 1e-4 (grid minimum) to 2.15e-3, rising
+steeply above. So the data give only an upper bound (gamma <~ 2e-3/day,
+mean carriage >~ 460 days). The old point 1.67e-3 is inside this set.
+Beta within 5%: 2.0e-4..7.9e-4 (4x); epsilon 1e-4..7.1e-4 (>=7x).
+Consequence: with almost no decolonization in a closed population, endemic
+training trajectories rise on average 0.194 -> 0.248 over 16 weeks, while
+real pooled prevalence falls to 0.116-0.125 in weeks 13-16.
+Locked decision 8 (grid search) is unchanged; only the grid range and the
+widening rule changed. "Implausible" claim removed from the report.
+
+### 2. Unstable eigenvalues were not reported (P6/P7)
+With the new calibration all three operators have spectral radius > 1:
+D1 1.0144, D2 1.0218, D3 1.0156. Eigenvalues with magnitude >= 1: 6 of 7,
+13 of 28, 8 of 25 (each count includes the constant feature's eigenvalue of
+exactly 1). Now stated in REPORT section 3.5. Sim test h=1 RMSE: D1 0.00519,
+D2 0.00522, D3 0.00516 vs persistence 0.00611 (15% skill, 26-28% at h=4).
+Selected lambda: D1 0.162, D2 0.483, D3 0.483. D3 rank(K) still 19 of 25.
+
+### 3. Koopman score measured the equilibrium pattern, not influence (P7)
+The dominant-mode right-eigenvector share describes where the persistent
+pattern sits (for D1 in the first version, the lambda=1 mode). New module
+src/influence.py: seed 3 extra colonized people in one ward (prevalence step
+3/N_j), roll K forward 16 weeks from the real calibration-weeks mean state,
+sum predicted extra colonized person-weeks (total and spillover).
+Output p7_koopman_influence.csv; config KOOPMAN_INFLUENCE_N_SEED=3,
+KOOPMAN_INFLUENCE_HORIZON=16. Results (total): D1 Menard 1 56.8 top,
+D2 Menard 2 56.7 top, D3 Menard 1 57.6 top. Spillover -5.5..+6.5, partly
+negative (a quadratic-term artefact, noted in the report).
+Mode shares now: D1 Menard 1 0.566 (lambda 1.0144), D2 Sorrel 2 0.338
+(1.0218), D3 Menard 1 0.595 (1.0156 +- 0.031i).
+
+### 4. Ground truth was close to circular for degree (P9)
+A 50% cut removes more contact-hours from high-volume wards, and infection
+risk rises with contact-hours, so degree (= volume) matches it by
+construction. Added ground truth B: remove the SAME contact-hours from each
+ward (src/intervention.py ward_touching_seconds, equal_hours_scales;
+config P9_EQUAL_HOURS_FRACTION_OF_MIN=0.5 -> 1,602.19 hours each = half of
+Other's 3,204.38). Output p9_ground_truth_equal_hours.csv. Locked decision
+14 is kept as ground truth A; B is an addition.
+Spearman now uses an exact permutation p-value over all 720 orderings
+(src/metrics.py spearman_exact).
+Results vs A: degree 0.943 (p 0.017), koopman_D3 mode 0.829 (0.058),
+influence D3 0.771, eigenvector 0.714, influence D2 0.714, koopman_D1 0.600,
+betweenness 0.309, influence D1 0.257, koopman_D2 -0.371.
+Results vs B: drops 19.8-44.0 person-days with overlapping CIs except
+Sorrel 1 (44.0, CI 31.9-56.2). Best candidate eigenvector 0.600 (p 0.24);
+degree 0.257; no candidate significant.
+Koopman scores moved with the calibration point: mode-share rho vs A was
+0.26-0.54 with the old point, now -0.37..0.83. Degree stays 0.943.
+
+### 5. No uncertainty on intervention differences (P10)
+Added paired 95% t-CIs per strategy (drop_ci_low/high), per-replicate output
+p10_per_replicate.csv, and p10_pairwise_comparisons.csv (every strategy vs
+degree / random / whole-hospital per (k, R) cell, src/metrics.py
+paired_mean_ci, verdict better / worse / not distinguishable). Added
+koopman_influence_targeted_D1/D2/D3 strategies; existing strategy names kept.
+Results: degree-targeted beats random and whole-hospital in all 6 cells.
+Koopman D2 mode-share (Sorrel 2; Sorrel 2+Sorrel 0) is worse than both
+untargeted strategies in all 6 cells. Influence D1/D3 pick the same wards as
+degree in every cell. Koopman D3 mode-share (Menard 1+Sorrel 1) vs degree
+(Menard 1+Menard 2) at k=2: +1.2 [-12.2, 14.6] at R=25%, +7.0 [-12.4, 26.4]
+at 50%, +30.9 [6.9, 54.9] (p 0.012) at 75%, one significant cell out of 48
+comparisons vs degree. Random vs whole-hospital: not distinguishable in all
+6 cells. Best drop 519.6 of 10,659 baseline person-days (4.9%).
+
+### 6. "Statistically indistinguishable" had no test (P8)
+Added src/metrics.py block_bootstrap_rmse_diff (paired, resamples whole
+forecast start weeks, 10,000 resamples; only 5 start weeks per holdout
+horizon) and binomial_noise_floor; outputs p8_significance_vs_persistence.csv
+and p8_noise_floor.csv. The binomial SE (0.057 RMS) is NOT a lower bound on
+RMSE here: persistence scores 0.046 at h=1 because consecutive weeks mostly
+re-swab the same people (correlated sampling error). Docstring says so.
+Results (holdout, RMSE minus persistence): h=1 all EDMD within
+[-0.0005, +0.0018]; h=3 D1 +0.0033 [0.0005, 0.0049], D2 +0.0029
+[0.00002, 0.0048], D3 +0.0037 [0.0009, 0.0054]; h=4 D1 +0.0053
+[0.0007, 0.0079], D2 +0.0044 [-0.0004, 0.0068], D3 +0.0058
+[0.0003, 0.0088]. So EDMD is slightly but measurably worse than persistence
+at 3-4 weeks with the new calibration. With the old point it was tied
+(h=3 0.0864 vs 0.0865): the sign of this gap depends on the unidentified
+gamma.
+
+### P11 after the rerun
+E1 0.943, E2 max |ratio-1| 0.016, E3 1.0/1.0, E4 1.0 (alt gamma 2.15e-3),
+E5 1.0, E6 1.0, E7 0.50 (three models within 0.0003 RMSE, ties), E8 RMSE
+ratio 0.999 but dominant ward now DIFFERS (full Menard 1, reduced Sorrel 2):
+mode shares are fragile.
+
+### Verification
+- tests/test_review_fixes.py: 15 new tests, all hand-computed (grid
+  widening, profile loss, near-optimal interval, identity-operator influence
+  = n_seed x horizon, hand-computed spillover 1.5 on a known K, ward sizes,
+  touching seconds, equal-hours removal = 100 s per ward, paired CI vs
+  scipy ttest, exact Spearman p by brute force and 2/720 for a perfect
+  ranking, block bootstrap zero/negative cases, noise floor by hand, P10
+  pairwise sign and verdict). Full suite: 194 passed (tests/test_demo.py,
+  part of the separate uncommitted demo add-on, is not counted; it
+  hardcodes the old P10 Koopman ward picks and needs updating there).
+- Independent cross-checks (csv module + scipy, not the pipeline code):
+  touching contact-hours per ward from edges_master.csv and removed hours
+  1,602.18958 matched; koopman_D3 vs degree paired difference at k=2/R=75%
+  recomputed from p10_per_replicate.csv: 30.86 [6.85, 54.87], p 0.0120,
+  matched; degree's exact p = 12/720 = 0.01667 by hand count (identity +
+  5 adjacent swaps, both signs) matched.
+- P2 outputs rewritten by the rerun differed only in row order and
+  <= 4e-16 floats (the known BLAS non-determinism); restored from git.
+
+| metric | expected | computed | match? |
+|---|---|---|---|
+| removed contact-hours (equal-hours GT) | 1602.18958 (csv module) | 1602.18958 | yes |
+| D3 vs degree advantage, k=2 R=75% | 30.86 [6.85, 54.87] (scipy) | 30.86 [6.85, 54.87] | yes |
+| exact Spearman p for rho=0.943, n=6 | 12/720 = 0.01667 | 0.01667 | yes |
+| D3 rank(K) | 19 | 19 | yes |
+| trajectory split | 210/44/46 | 210/44/46 | yes |

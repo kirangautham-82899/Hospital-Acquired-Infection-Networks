@@ -15,7 +15,15 @@ import numpy as np
 import pandas as pd
 
 import config
-from src.calibrate_sim import evaluate_grid_point, grid_search, is_on_edge, replicate_seed_pairs
+from src.calibrate_sim import (
+    evaluate_grid_point,
+    grid_search,
+    is_on_edge,
+    near_optimal_interval,
+    profile_loss,
+    replicate_seed_pairs,
+    widened_grid,
+)
 from src.load import load_admission, load_contacts, load_microbio
 from src.network import filter_edges, filter_people
 from src.simulate import build_person_index, daily_edge_arrays, simulation_day_list
@@ -53,33 +61,29 @@ def load_p4_inputs(population="all"):
     }
 
 
-def widen_grid_if_needed(table, beta_grid, gamma_grid, epsilon_grid, ctx, max_rounds=1):
-    """If the best grid point sits on an edge, widen that axis (extend the
-    range 3x in the hugged direction, same point density) and rerun the
-    full grid search once. Returns (table, beta_grid, gamma_grid, epsilon_grid, widened: bool)."""
-    best = table.iloc[0]
-    edges = is_on_edge(best, beta_grid, gamma_grid, epsilon_grid)
-    if not edges or max_rounds <= 0:
-        return table, beta_grid, gamma_grid, epsilon_grid, False
-
-    print(f"Best grid point is on an edge: {edges}. Widening and re-running once.")
-    new_grids = {"beta": list(beta_grid), "gamma": list(gamma_grid), "epsilon": list(epsilon_grid)}
-    for name, direction in edges.items():
-        grid = np.array(new_grids[name])
-        n = len(grid)
-        if direction == "low":
-            new_min, new_max = grid.min() / 3.0, grid.max()
-        else:
-            new_min, new_max = grid.min(), grid.max() * 3.0
-        new_grids[name] = list(np.geomspace(new_min, new_max, n))
-
-    widened_table = grid_search(
-        ctx["people"], ctx["index"], ctx["day_list"], ctx["edge_arrays_by_day"],
-        ctx["pre_window_last_status"], ctx["admission"], ctx["microbio_in_window"], ctx["groups"],
-        ctx["states_real"], beta_grid=new_grids["beta"], gamma_grid=new_grids["gamma"],
-        epsilon_grid=new_grids["epsilon"],
-    )
-    return widened_table, new_grids["beta"], new_grids["gamma"], new_grids["epsilon"], True
+def widen_grid_if_needed(table, beta_grid, gamma_grid, epsilon_grid, ctx, max_rounds=None):
+    """While the best grid point sits on an edge, widen that axis
+    (extend the range CALIBRATION_WIDEN_FACTOR x in the hugged direction,
+    same point density) and rerun the full grid search, up to max_rounds
+    times. Returns (table, beta_grid, gamma_grid, epsilon_grid, n_rounds)."""
+    max_rounds = config.CALIBRATION_MAX_WIDEN_ROUNDS if max_rounds is None else max_rounds
+    grids = {"beta": list(beta_grid), "gamma": list(gamma_grid), "epsilon": list(epsilon_grid)}
+    n_rounds = 0
+    while n_rounds < max_rounds:
+        edges = is_on_edge(table.iloc[0], grids["beta"], grids["gamma"], grids["epsilon"])
+        if not edges:
+            break
+        n_rounds += 1
+        print(f"Best grid point is on an edge: {edges}. Widening (round {n_rounds}) and re-running.")
+        for name, direction in edges.items():
+            grids[name] = widened_grid(grids[name], direction)
+        table = grid_search(
+            ctx["people"], ctx["index"], ctx["day_list"], ctx["edge_arrays_by_day"],
+            ctx["pre_window_last_status"], ctx["admission"], ctx["microbio_in_window"], ctx["groups"],
+            ctx["states_real"], beta_grid=grids["beta"], gamma_grid=grids["gamma"],
+            epsilon_grid=grids["epsilon"],
+        )
+    return table, grids["beta"], grids["gamma"], grids["epsilon"], n_rounds
 
 
 def build(population=None, n_trajectories=None):
@@ -100,7 +104,7 @@ def build(population=None, n_trajectories=None):
         ctx["pre_window_last_status"], ctx["admission"], ctx["microbio_in_window"], ctx["groups"],
         ctx["states_real"],
     )
-    table, beta_grid, gamma_grid, epsilon_grid, widened = widen_grid_if_needed(
+    table, beta_grid, gamma_grid, epsilon_grid, n_widen_rounds = widen_grid_if_needed(
         table, config.BETA_GRID, config.GAMMA_GRID, config.EPSILON_GRID, ctx
     )
     table.to_csv(config.RESULTS_TABLES_DIR / "p4_calibration_grid.csv", index=False)
@@ -114,6 +118,20 @@ def build(population=None, n_trajectories=None):
               f"Report this as a limitation -- see research_log.md.")
     print(f"Loss ridge check: {int((table['loss'] < best['loss'] * 1.1).sum())} of {len(table)} grid points "
           f"are within 10% of the best loss (expect a ridge, not a single sharp minimum).")
+
+    # Identifiability: profile loss per parameter + near-optimal interval
+    tol = config.CALIBRATION_NEAR_OPTIMAL_TOL
+    ident_rows = []
+    for name in ["beta", "gamma", "epsilon"]:
+        lo, hi = near_optimal_interval(table, name, tol)
+        ident_rows.append({"param": name, "best": best[name], "near_optimal_min": lo, "near_optimal_max": hi,
+                           "ratio_max_over_min": hi / lo, "tol": tol})
+        profile_loss(table, name).to_csv(config.RESULTS_TABLES_DIR / f"p4_profile_{name}.csv", index=False)
+    ident = pd.DataFrame(ident_rows)
+    ident.to_csv(config.RESULTS_TABLES_DIR / "p4_identifiability.csv", index=False)
+    print(f"\nNear-optimal intervals (loss within {tol:.0%} of best):")
+    print(ident.to_string(index=False))
+    _profile_plot(table, best)
 
     # Held-out sanity check (never used to pick the point)
     seed_pairs = replicate_seed_pairs(config.N_CALIBRATION_REPLICATES)
@@ -132,7 +150,7 @@ def build(population=None, n_trajectories=None):
             {
                 "beta": best["beta"], "gamma": best["gamma"], "epsilon": best["epsilon"],
                 "calibration_loss": best["loss"], "holdout_loss": holdout_score,
-                "grid_widened": widened, "still_on_edge": bool(remaining_edges),
+                "grid_widen_rounds": n_widen_rounds, "still_on_edge": bool(remaining_edges),
             }
         ]
     )
@@ -168,6 +186,32 @@ def build(population=None, n_trajectories=None):
     print(f"states_sim.npz shape: {states.shape} [trajectory, week, group]")
 
     return {"table": table, "best": best, "states": states, "metadata": metadata}
+
+
+def _profile_plot(table, best):
+    """Profile loss (min over the other two parameters) for beta, gamma,
+    epsilon, with the near-optimal tolerance band marked."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 3, figsize=(13, 4), sharey=True)
+    best_loss = table["loss"].min()
+    for ax, name in zip(axes, ["beta", "gamma", "epsilon"]):
+        prof = profile_loss(table, name)
+        ax.plot(prof[name], prof["profile_loss"], "o-", color="steelblue")
+        ax.axhline(best_loss * (1 + config.CALIBRATION_NEAR_OPTIMAL_TOL), color="gray", linestyle=":",
+                   label=f"best loss +{config.CALIBRATION_NEAR_OPTIMAL_TOL:.0%}")
+        ax.axvline(best[name], color="darkorange", linestyle="--", label="best point")
+        ax.set_xscale("log")
+        ax.set_xlabel(name)
+    axes[0].set_ylabel("profile loss (min over other parameters)")
+    axes[0].legend(fontsize=8)
+    fig.suptitle("P4: calibration profile loss (flat = weakly identified)")
+    fig.tight_layout()
+    fig.savefig(config.RESULTS_FIGURES_DIR / "p4_profile_loss.png", dpi=150)
+    plt.close(fig)
 
 
 def _fit_plot(ctx, best, seed_pairs):

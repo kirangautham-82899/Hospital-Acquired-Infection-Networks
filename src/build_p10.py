@@ -3,7 +3,10 @@ see research_log.md for the Part A numbering caveat) under an
 equal-budget framework: none, random, whole-hospital, degree-targeted,
 and Koopman-targeted (one variant per dictionary, D1/D2/D3, since P9
 found they disagree on which ward matters most -- reporting all three
-rather than picking one). k=1 or 2 targeted wards, per-ward reductions
+rather than picking one). Two Koopman scores are targeted: the original
+dominant-mode ward share (koopman_targeted_*) and, after the Nov 14
+review, the seeded-perturbation influence score (koopman_influence_
+targeted_*, src/influence.py). k=1 or 2 targeted wards, per-ward reductions
 25/50/75%, 200 replicates with COMMON RANDOM NUMBERS shared across every
 strategy and config for a paired, variance-reduced comparison, all using
 P4's calibrated (beta, gamma, epsilon) and calibration initial condition
@@ -21,6 +24,8 @@ per DISTINCT budget and reused across every grid cell with that budget.
 Writes:
   results/tables/p10_intervention_results.csv   (every strategy x k x R row)
   results/tables/p10_best_strategy_per_budget.csv
+  results/tables/p10_per_replicate.csv          (every replicate's colonized person-days)
+  results/tables/p10_pairwise_comparisons.csv   (paired CIs vs degree / random / whole-hospital)
   results/figures/p10_drop_vs_budget.png
 """
 import numpy as np
@@ -34,7 +39,8 @@ from src.intervention import (
 )
 from src.load import load_admission, load_contacts
 from src.network import build_master_edge_list
-from src.risk import load_koopman_risk_scores, top_k_wards, ward_degree_centrality
+from src.metrics import paired_mean_ci
+from src.risk import load_koopman_influence_scores, load_koopman_risk_scores, top_k_wards, ward_degree_centrality
 from src.simulate import build_person_index, daily_edge_arrays, simulation_day_list
 from src.calibrate_sim import replicate_seed_pairs
 
@@ -47,6 +53,35 @@ def build_grid():
         for k in config.INTERVENTION_K_VALUES
         for R in config.INTERVENTION_REDUCTIONS
     ]
+
+
+def pairwise_comparisons(per_replicate, grid, references=("degree_targeted", "random", "whole_hospital")):
+    """For every (k, R) cell, compare every strategy against each
+    reference strategy using the PAIRED per-replicate difference in
+    colonized person-days (common random numbers make replicate i of
+    both arms share seeds). advantage = person_days(reference) -
+    person_days(strategy), so positive means the strategy prevented more
+    colonized person-days than the reference. Returns mean, 95% CI and
+    paired t-test p-value per comparison."""
+    out = []
+    for cell in grid:
+        k, R = cell["k"], cell["R"]
+        strategies = [s for (s, kk, RR) in per_replicate if kk == k and RR == R]
+        for ref in references:
+            if (ref, k, R) not in per_replicate:
+                continue
+            for s in strategies:
+                if s == ref:
+                    continue
+                adv = per_replicate[(ref, k, R)] - per_replicate[(s, k, R)]
+                ci = paired_mean_ci(adv)
+                out.append({
+                    "k": k, "R": R, "budget": cell["budget"], "strategy": s, "reference": ref,
+                    "advantage_mean": ci["mean"], "ci_low": ci["ci_low"], "ci_high": ci["ci_high"],
+                    "p_value": ci["p_value"],
+                    "verdict": "better" if ci["ci_low"] > 0 else ("worse" if ci["ci_high"] < 0 else "not distinguishable"),
+                })
+    return pd.DataFrame(out)
 
 
 def build(n_replicates=None):
@@ -77,7 +112,11 @@ def build(n_replicates=None):
     W_raw = pd.read_csv(config.RESULTS_TABLES_DIR / "p2_ward_matrix_raw_all.csv", index_col=0)
     assert list(W_raw.index) == groups
     degree_scores = ward_degree_centrality(W_raw.to_numpy(), groups)
-    koopman_scores = {name: load_koopman_risk_scores(name, groups) for name in config.EDMD_DICTIONARIES}
+    koopman_scores = {}
+    for name in config.EDMD_DICTIONARIES:
+        koopman_scores[f"koopman_targeted_{name}"] = load_koopman_risk_scores(name, groups)
+    for name in config.EDMD_DICTIONARIES:
+        koopman_scores[f"koopman_influence_targeted_{name}"] = load_koopman_influence_scores(name, groups)
 
     # ---- none (baseline) ----
     none_edge_arrays = daily_edge_arrays(edges, index)
@@ -108,14 +147,19 @@ def build(n_replicates=None):
         }
     ]
 
+    per_replicate = {("none", 0, 0.0): none_totals}
+
     def add_row(strategy, k, R, budget, targeted_wards, totals):
         drop = none_totals - totals
         drop_fraction = np.divide(drop, none_totals, out=np.full_like(drop, np.nan), where=none_totals != 0)
+        ci = paired_mean_ci(drop)
+        per_replicate[(strategy, k, R)] = totals
         rows.append(
             {
                 "strategy": strategy, "k": k, "R": R, "budget": budget,
                 "targeted_wards": ",".join(targeted_wards) if targeted_wards else "",
                 "mean_person_days": totals.mean(), "drop_mean": drop.mean(), "drop_std": drop.std(ddof=1),
+                "drop_ci_low": ci["ci_low"], "drop_ci_high": ci["ci_high"],
                 "drop_fraction_mean": float(np.nanmean(drop_fraction)),
             }
         )
@@ -126,24 +170,29 @@ def build(n_replicates=None):
 
         add_row("whole_hospital", k, R, budget, [], whole_hospital_totals[budget])
 
+        totals_cache = {}
         degree_wards = top_k_wards(degree_scores, k)
         scaled = scale_multiple_ward_edges(edges, admission, degree_wards, scale=1.0 - R)
         totals = run_person_days_replicates(
             people, index, day_list, daily_edge_arrays(scaled, index), beta, gamma, epsilon,
             pre_window_last_status, admission, seed_pairs,
         )
+        totals_cache[tuple(sorted(degree_wards))] = totals
         add_row("degree_targeted", k, R, budget, degree_wards, totals)
         print(f"  degree_targeted {degree_wards}: drop={none_totals.mean() - totals.mean():.2f}")
 
-        for name in config.EDMD_DICTIONARIES:
-            koop_wards = top_k_wards(koopman_scores[name], k)
-            scaled = scale_multiple_ward_edges(edges, admission, koop_wards, scale=1.0 - R)
-            totals = run_person_days_replicates(
-                people, index, day_list, daily_edge_arrays(scaled, index), beta, gamma, epsilon,
-                pre_window_last_status, admission, seed_pairs,
-            )
-            add_row(f"koopman_targeted_{name}", k, R, budget, koop_wards, totals)
-            print(f"  koopman_targeted_{name} {koop_wards}: drop={none_totals.mean() - totals.mean():.2f}")
+        for strategy, score in koopman_scores.items():
+            koop_wards = top_k_wards(score, k)
+            key = tuple(sorted(koop_wards))
+            if key not in totals_cache:  # same ward set + R gives identical CRN totals
+                scaled = scale_multiple_ward_edges(edges, admission, koop_wards, scale=1.0 - R)
+                totals_cache[key] = run_person_days_replicates(
+                    people, index, day_list, daily_edge_arrays(scaled, index), beta, gamma, epsilon,
+                    pre_window_last_status, admission, seed_pairs,
+                )
+            totals = totals_cache[key]
+            add_row(strategy, k, R, budget, koop_wards, totals)
+            print(f"  {strategy} {koop_wards}: drop={none_totals.mean() - totals.mean():.2f}")
 
         random_totals, _ = run_person_days_random_wards(
             people, index, day_list, edges, admission, groups, k, 1.0 - R,
@@ -154,6 +203,20 @@ def build(n_replicates=None):
 
     results = pd.DataFrame(rows)
     results.to_csv(config.RESULTS_TABLES_DIR / "p10_intervention_results.csv", index=False)
+
+    per_rep_df = pd.DataFrame(
+        [
+            {"strategy": s, "k": k, "R": R, "replicate": i, "person_days": float(v)}
+            for (s, k, R), arr in per_replicate.items()
+            for i, v in enumerate(arr)
+        ]
+    )
+    per_rep_df.to_csv(config.RESULTS_TABLES_DIR / "p10_per_replicate.csv", index=False)
+
+    pairwise = pairwise_comparisons(per_replicate, grid)
+    pairwise.to_csv(config.RESULTS_TABLES_DIR / "p10_pairwise_comparisons.csv", index=False)
+    print("\nPaired comparisons (drop of strategy A minus drop of strategy B; positive = A better):")
+    print(pairwise.to_string(index=False))
 
     best_per_budget = (
         results[results["strategy"] != "none"]
@@ -177,16 +240,21 @@ def _plot(results):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    # One panel per k, so k=1 and k=2 cells that share a budget are never
+    # joined by one line. Strategies that target identical wards overlap.
+    ks = config.INTERVENTION_K_VALUES
+    fig, axes = plt.subplots(1, len(ks), figsize=(13, 5), sharey=True)
     strategies = [s for s in results["strategy"].unique() if s != "none"]
-    for strategy in strategies:
-        sub = results[results["strategy"] == strategy].sort_values("budget")
-        ax.errorbar(sub["budget"], sub["drop_mean"], yerr=sub["drop_std"] / np.sqrt(config.INTERVENTION_N_REPLICATES),
-                     marker="o", label=strategy, capsize=3)
-    ax.set_xlabel("budget (k x reduction fraction)")
-    ax.set_ylabel("drop in colonized person-days vs no intervention\n(mean +/- standard error)")
-    ax.set_title("P10: intervention strategy comparison, equal budget")
-    ax.legend(fontsize=7, loc="upper left")
+    for ax, k in zip(np.atleast_1d(axes), ks):
+        for strategy in strategies:
+            sub = results[(results["strategy"] == strategy) & (results["k"] == k)].sort_values("budget")
+            err = [sub["drop_mean"] - sub["drop_ci_low"], sub["drop_ci_high"] - sub["drop_mean"]]
+            ax.errorbar(sub["budget"], sub["drop_mean"], yerr=err, marker="o", label=strategy, capsize=3)
+        ax.set_title(f"k = {k} targeted ward{'s' if k > 1 else ''}")
+        ax.set_xlabel("budget (k x reduction fraction)")
+    np.atleast_1d(axes)[0].set_ylabel("drop in colonized person-days vs no intervention\n(mean, 95% paired CI)")
+    np.atleast_1d(axes)[0].legend(fontsize=7, loc="upper left")
+    fig.suptitle("P10: intervention strategy comparison, equal budget")
     fig.tight_layout()
     fig.savefig(config.RESULTS_FIGURES_DIR / "p10_drop_vs_budget.png", dpi=150)
     plt.close(fig)

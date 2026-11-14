@@ -28,6 +28,15 @@ def load_koopman_risk_scores(dict_name, groups):
     return sub.reindex(groups)
 
 
+def load_koopman_influence_scores(dict_name, groups, column="influence_total"):
+    """Koopman influence score from P7 (p7_koopman_influence.csv, see
+    src/influence.py): extra colonized person-weeks the fitted operator
+    predicts after seeding a fixed number of people in each ward."""
+    df = pd.read_csv(config.RESULTS_TABLES_DIR / "p7_koopman_influence.csv")
+    sub = df[df["dictionary"] == dict_name].set_index("ward")[column]
+    return sub.reindex(groups)
+
+
 def ward_degree_centrality(W_raw, groups):
     """Row sum of the raw ward contact matrix: total contact-seconds
     exposure for each ward's own people -- a simple 'activity level'
