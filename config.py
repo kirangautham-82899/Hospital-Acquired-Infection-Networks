@@ -104,3 +104,9 @@ E9_INTERVENTION_CELLS = [(1, 0.50), (2, 0.75)]
 # Third review: also walk the beta and epsilon profiles, not only gamma,
 # so beta's factor-4 uncertainty is propagated too.
 E9_RIDGE_AXES = ("gamma", "beta", "epsilon")
+
+# --- Results app (app/app.py, src/app_data.py): read-only viewer of saved results ---
+APP_MODEL = "D3"  # dictionary used for the app's what-if forecast (best h=1 RMSE in P6)
+APP_OUTBREAK_BUMP = 0.30  # what-if: add this much prevalence to the chosen ward's usual level
+APP_HORIZON_WEEKS = 8  # what-if forecast length (K was trained on 16-week trajectories)
+APP_REAL_WARDS = ["Menard 1", "Menard 2", "Sorrel 0", "Sorrel 1", "Sorrel 2"]  # wards an outbreak can be started in

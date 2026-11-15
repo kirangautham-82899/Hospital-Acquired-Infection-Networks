@@ -1391,3 +1391,46 @@ koopman_D2 -0.086, influence D3 -0.257, koopman_D1 -0.314, influence D1
 | E9 points | 5 gamma + 2 beta + 2 epsilon | 9 | yes |
 | degree vs random/whole comparisons | 2 cells x 9 points x 2 refs = 36 | 36 better | yes |
 | Koopman vs degree comparisons | 2 cells x 9 points x 6 scores = 108 | 108 | yes |
+
+## Results app (Nov 15, after P12)
+
+Added a read-only Streamlit app (`app/app.py`, helpers in `src/app_data.py`)
+to show the results to a non-specialist. It reads `results/` only; nothing
+is simulated or re-fitted. Four tabs: the hospital (W heatmap), what happened
+(real weekly prevalence + one-week D3 forecast vs persistence from P8), what
+will happen (what-if outbreak), which ward to protect (P10 + P9).
+
+New config values: APP_MODEL = D3, APP_OUTBREAK_BUMP = 0.30,
+APP_HORIZON_WEEKS = 8, APP_REAL_WARDS.
+
+### What-if design (assumption, not a locked decision)
+- Start state = each group's mean real prevalence over the calibration weeks
+  (weeks 0-11); the chosen ward gets +30 percentage points. Both this state
+  and the no-outbreak state are rolled forward with the saved D3 K, and the
+  app shows the difference ("extra MRSA").
+- Finding: D3 keeps the outbreak almost entirely in its own ward over 8
+  weeks. Extra prevalence in any other group at week 8 is at most 3.8
+  points (Menard 2 outbreak -> Sorrel 1), and below 0.5 points for Sorrel 0
+  and Sorrel 1 outbreaks. Some groups show small negative "extra" values
+  (down to -2.4 points), which are model artefacts, not a protective effect.
+  The +30-point start is outside the endemic range K was trained on
+  (outbreak starts in training were 1-3 seeded people), so the app labels
+  this as an estimate.
+- Intervention sentence: when the Koopman and degree picks differ, it calls
+  them tied if their 95% CIs overlap (true at k=2 for all three reductions).
+
+### Verification
+- tests/test_app_data.py (18) and tests/test_app_ui.py (7, Streamlit
+  AppTest clicking every ward and every (k, R) setting). Full suite: 222
+  passed.
+- Cross-check 1: the app's rollout from P8's first start week reproduces
+  the saved D3 one-week forecast in p8_forecast_records_long.csv (atol 1e-9).
+- Cross-check 2: the usual-state averages recomputed with the csv module
+  match pandas.
+
+| metric | expected | computed | match? |
+|---|---|---|---|
+| D3 h=1 forecast from week 0 | p8 saved values | identical (atol 1e-9) | yes |
+| usual state (6 groups) | csv-module means | same | yes |
+| Koopman / random, k=1 R=50% | 234.79 / 107.58 = 2.18 | 2.2x | yes |
+| people = patients + staff | 589 = 329 + 260 | 589 | yes |
