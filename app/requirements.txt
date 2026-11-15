@@ -1,0 +1,7 @@
+# Dependencies for the results app on Streamlit Community Cloud (Python 3.11).
+# Streamlit Cloud reads this file because it sits next to the entrypoint
+# app/app.py; the root requirements.txt is the full local research environment.
+streamlit==1.67.0
+plotly==7.1.0
+numpy==2.4.6
+pandas==3.0.6

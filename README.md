@@ -98,6 +98,11 @@ streamlit run app/app.py
 It opens at http://localhost:8501. Run it locally only: the data licence is
 unverified, so do not deploy it publicly.
 
+`app/requirements.txt` lists only what the app needs (streamlit, plotly,
+numpy, pandas), for Streamlit Community Cloud with Python 3.11, should
+deployment ever be approved. The root `requirements.txt` is the full local
+research environment.
+
 ## Running tests
 
 ```bash
