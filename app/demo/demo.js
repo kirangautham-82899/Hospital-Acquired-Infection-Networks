@@ -561,50 +561,148 @@
   // ======================================================================
   // Scene: Forecast, as "how close was each guess" for one week.
   // ======================================================================
-  const FC = { x0: 210, x1: 940, y0: 128, dy: 72 };
+  // ======================================================================
+  // Forecast scene: each held-out week is built up in steps
+  //   rows -> "same as last week" -> Koopman slides out -> real swabs drop in
+  //   -> misses measured -> the week's score; after the last week, a verdict.
+  // ======================================================================
+  const FC = { x0: 210, x1: 800, y0: 136, dy: 70 };
   const fcMax = Math.ceil(Math.max(...D.forecast.points.flatMap((p) => [p.pred, p.actual]).filter((v) => v != null)) * 10 + 0.5) / 10;
   const fcX = (v) => FC.x0 + (FC.x1 - FC.x0) * clamp(v, 0, fcMax) / fcMax;
-  const fcDots = {};
-  function drawForecast() {
+  const FC_WEEKS = [...new Set(D.forecast.points.map((p) => p.landing_week))].sort((a, b) => a - b);
+  const rmseOf = (m) => (D.forecast.rmse.find((x) => x.model === m && x.h === 1) || {}).rmse;
+  const FSTEPS = [
+    { dur: 2.8, cap: (w) => `<b>Week ${w}.</b> Six wards. What share will carry MRSA?` },
+    { dur: 3.6, cap: () => `The simplest guess: <b>same as last week</b>.` },
+    { dur: 3.8, cap: () => `<b>Koopman's forecast</b>, made a week earlier, moves away from last week's value.` },
+    { dur: 3.8, cap: () => `Then the <b>real swabs</b> come in.` },
+    { dur: 4.0, cap: () => `Measure each <b>miss</b>: the distance from the real value to each guess.` },
+    { dur: 4.0, cap: (w, s) => `Week ${w} score: Koopman missed by <b>${s.k} points</b> on average, "same as last week" by <b>${s.p}</b>.` },
+  ];
+  const VERDICT = { dur: 6, cap: () => `Over all ${FC_WEEKS.length} held-out weeks: <b>${(rmseOf(MODEL) * 100).toFixed(1)}</b> vs <b>${(rmseOf("persistence") * 100).toFixed(1)}</b> points (RMSE). <b>A tie</b>: Koopman does not beat the simplest guess.` };
+  const FS = { wi: Math.max(0, FC_WEEKS.indexOf(13)), i: 0, t: 0 };
+  const fsStep = () => (FS.i < FSTEPS.length ? FSTEPS[FS.i] : VERDICT);
+
+  function fcRow(g, w) {
+    const act = prevAt(w, g), k = fcPoint(MODEL, g, w), p = fcPoint("persistence", g, w);
+    return act == null || !k ? null : { act, k: k.pred, p: p ? p.pred : act };
+  }
+  function weekScore(w) {
+    let ek = 0, ep = 0, n = 0;
+    G.forEach((g) => { const r = fcRow(g, w); if (r) { ek += Math.abs(r.k - r.act); ep += Math.abs(r.p - r.act); n++; } });
+    return n ? { k: (ek / n * 100).toFixed(1), p: (ep / n * 100).toFixed(1) } : { k: "—", p: "—" };
+  }
+  function fsGo(wi, i) {
+    const last = FS.i >= FSTEPS.length;
+    if (i >= FSTEPS.length + (wi === FC_WEEKS.length - 1 ? 1 : 0)) { wi += 1; i = 0; }
+    if (i < 0) { wi -= 1; i = FSTEPS.length - 1; }
+    wi = (wi + FC_WEEKS.length) % FC_WEEKS.length;
+    const weekChanged = FC_WEEKS[wi] !== S.fcWeek;
+    Object.assign(FS, { wi, i, t: 0 }); S.fcWeek = FC_WEEKS[wi];
+    const el = $("seqCaption"); if (el) { el.innerHTML = fsStep().cap(S.fcWeek, weekScore(S.fcWeek)); el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
+    const st = $("seqStep"); if (st) st.textContent = FS.i < FSTEPS.length ? `${FS.i + 1} / ${FSTEPS.length}` : "verdict";
+    document.querySelectorAll("[data-fw]").forEach((b) => b.classList.toggle("on", +b.dataset.fw === S.fcWeek));
+    if (weekChanged || last) renderPanel(false);
+  }
+
+  function drawForecast(time, dt) {
+    const step = fsStep();
+    if (S.playing) { FS.t += dt; if (FS.t > step.dur) fsGo(FS.wi, FS.i + 1); }
+    const t = FS.t, si = FS.i, ease = (x) => 1 - Math.pow(1 - clamp(x, 0, 1), 3);
+    const stagger = (i, d = 0.35, len = 0.5) => (si === FS.i ? clamp((t - 0.3 - i * d) / len, 0, 1) : 1);
+    const w = S.fcWeek, verdict = FS.i >= FSTEPS.length;
     ctx.fillStyle = rgb(T.corridor); ctx.fillRect(0, 0, W, H);
-    ctx.textAlign = "left"; ctx.fillStyle = rgb(T.ink); ctx.font = "650 20px Geist, Inter, system-ui, sans-serif";
-    ctx.fillText(`Week ${S.fcWeek}: the real MRSA share, and two guesses made a week earlier`, 40, 50);
-    // legend
-    const lg = [["Real", T.pos, true], [`Koopman (${MODEL})`, T.accent, true], ["Same as last week", T.muted, false]];
-    let lx = 40; ctx.font = "500 13px Geist, Inter, system-ui, sans-serif";
-    lg.forEach(([t, c, solid]) => {
-      ctx.beginPath(); ctx.arc(lx + 6, 78, 6, 0, 7);
+    ctx.save(); if (verdict) ctx.globalAlpha = 0.25;
+    ctx.textAlign = "left"; ctx.fillStyle = rgb(T.ink); ctx.font = "650 22px Geist, Inter, system-ui, sans-serif"; ctx.fillText(`Week ${w}`, 40, 50);
+    // legend appears with each layer
+    const lg = [["Same as last week", T.muted, false, 1], [`Koopman (${MODEL})`, T.accent, true, 2], ["Real", T.pos, true, 3]];
+    let lx = 140; ctx.font = "500 13px Geist, Inter, system-ui, sans-serif";
+    lg.forEach(([label, c, solid, from]) => {
+      if (si < from && !verdict) return;
+      ctx.beginPath(); ctx.arc(lx + 6, 44, 6, 0, 7);
       if (solid) { ctx.fillStyle = rgb(c); ctx.fill(); } else { ctx.strokeStyle = rgb(c); ctx.lineWidth = 2.2; ctx.stroke(); }
-      ctx.fillStyle = rgb(T.muted); ctx.fillText(t, lx + 18, 83); lx += ctx.measureText(t).width + 44;
+      ctx.fillStyle = rgb(T.muted); ctx.fillText(label, lx + 18, 49); lx += ctx.measureText(label).width + 44;
     });
     // grid
+    const yEnd = FC.y0 + FC.dy * (G.length - 1);
     for (let v = 0; v <= fcMax + 1e-9; v += 0.1) {
       const x = fcX(v); ctx.strokeStyle = rgb(T.line); ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(x, FC.y0 - 22); ctx.lineTo(x, FC.y0 + FC.dy * (G.length - 1) + 24); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x, FC.y0 - 30); ctx.lineTo(x, yEnd + 26); ctx.stroke();
       ctx.fillStyle = rgb(T.muted); ctx.textAlign = "center"; ctx.font = "500 12px Geist, Inter, system-ui, sans-serif";
-      ctx.fillText(Math.round(v * 100) + "%", x, FC.y0 + FC.dy * (G.length - 1) + 44);
+      ctx.fillText(Math.round(v * 100) + "%", x, yEnd + 46);
     }
-    let errK = 0, errP = 0, n = 0;
+    ctx.fillStyle = rgb(T.muted); ctx.font = "600 11px Geist, Inter, system-ui, sans-serif"; ctx.textAlign = "left";
+    if (si >= 4 || verdict) ctx.fillText("CLOSER GUESS", 836, FC.y0 - 34);
     G.forEach((g, i) => {
-      const y = FC.y0 + i * FC.dy, act = prevAt(S.fcWeek, g), k = fcPoint(MODEL, g, S.fcWeek), p = fcPoint("persistence", g, S.fcWeek);
+      const y = FC.y0 + i * FC.dy, r = fcRow(g, w), rowIn = si === 0 && !verdict ? ease(stagger(i, 0.12, 0.4)) : 1;
+      ctx.save(); ctx.globalAlpha *= rowIn;
       if (g === S.fcWard || g === S.hover) { roundRect(24, y - 28, 952, 56, 12); ctx.fillStyle = rgb(T.accent, g === S.fcWard ? 0.09 : 0.05); ctx.fill(); }
       ctx.textAlign = "left"; ctx.fillStyle = rgb(T.ink); ctx.font = "600 15px Geist, Inter, system-ui, sans-serif"; ctx.fillText(g, 40, y + 5);
-      if (act == null || !k) { ctx.fillStyle = rgb(T.muted); ctx.font = "500 13px Geist, Inter, system-ui, sans-serif"; ctx.fillText("not tested this week", FC.x0, y + 5); return; }
-      const d = fcDots[g] || (fcDots[g] = { a: act, k: k.pred, p: p ? p.pred : act });
-      const ease = reduceMotion ? 1 : 0.12;
-      d.a = lerp(d.a, act, ease); d.k = lerp(d.k, k.pred, ease); d.p = lerp(d.p, p ? p.pred : act, ease);
-      // miss bars from the real value to each guess
-      ctx.lineCap = "round";
-      ctx.strokeStyle = rgb(T.muted, 0.45); ctx.lineWidth = 3; ctx.setLineDash([2, 6]); ctx.beginPath(); ctx.moveTo(fcX(d.a), y + 9); ctx.lineTo(fcX(d.p), y + 9); ctx.stroke(); ctx.setLineDash([]);
-      ctx.strokeStyle = rgb(T.accent, 0.5); ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(fcX(d.a), y - 9); ctx.lineTo(fcX(d.k), y - 9); ctx.stroke();
-      ctx.beginPath(); ctx.arc(fcX(d.p), y + 9, 7, 0, 7); ctx.fillStyle = rgb(T.surface); ctx.fill(); ctx.strokeStyle = rgb(T.muted); ctx.lineWidth = 2.4; ctx.stroke();
-      ctx.beginPath(); ctx.arc(fcX(d.k), y - 9, 7.5, 0, 7); ctx.fillStyle = rgb(T.accent); ctx.fill();
-      ctx.beginPath(); ctx.arc(fcX(d.a), y, 9.5, 0, 7); ctx.fillStyle = rgb(T.pos); ctx.fill(); ctx.strokeStyle = rgb(T.surface); ctx.lineWidth = 2.5; ctx.stroke();
-      errK += Math.abs(k.pred - act); errP += Math.abs((p ? p.pred : act) - act); n++;
+      if (!r) { ctx.fillStyle = rgb(T.muted); ctx.font = "500 13px Geist, Inter, system-ui, sans-serif"; ctx.fillText("not tested this week", FC.x0, y + 5); ctx.restore(); return; }
+      const at = (from) => verdict || si > from ? 1 : si === from ? stagger(i) : 0;
+      const pIn = at(1), kIn = at(2), aIn = at(3), mIn = at(4);
+      // misses: lines grow from the real value toward each guess
+      if (mIn > 0) {
+        ctx.lineCap = "round";
+        ctx.strokeStyle = rgb(T.muted, 0.5); ctx.lineWidth = 3; ctx.setLineDash([2, 6]);
+        ctx.beginPath(); ctx.moveTo(fcX(r.act), y + 9); ctx.lineTo(lerp(fcX(r.act), fcX(r.p), ease(mIn)), y + 9); ctx.stroke(); ctx.setLineDash([]);
+        ctx.strokeStyle = rgb(T.accent, 0.55); ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(fcX(r.act), y - 9); ctx.lineTo(lerp(fcX(r.act), fcX(r.k), ease(mIn)), y - 9); ctx.stroke();
+        if (mIn >= 1) {
+          const dk = Math.abs(r.k - r.act), dp = Math.abs(r.p - r.act), tie = Math.abs(dk - dp) < 0.005;
+          const label = tie ? "tie" : dk < dp ? "Koopman" : "last week", col = tie ? T.muted : dk < dp ? T.accent : T.ink;
+          ctx.font = "650 12.5px Geist, Inter, system-ui, sans-serif"; const lw = ctx.measureText(label).width + 18;
+          roundRect(836, y - 12, lw, 24, 12); ctx.fillStyle = rgb(col, 0.12); ctx.fill(); ctx.fillStyle = rgb(col); ctx.textAlign = "left"; ctx.fillText(label, 845, y + 4.5);
+        }
+      }
+      // "same as last week" (hollow)
+      if (pIn > 0) {
+        ctx.globalAlpha *= ease(pIn); const sc = 0.6 + 0.4 * ease(pIn);
+        ctx.beginPath(); ctx.arc(fcX(r.p), y + 9, 7 * sc, 0, 7); ctx.fillStyle = rgb(T.surface); ctx.fill(); ctx.strokeStyle = rgb(T.muted); ctx.lineWidth = 2.4; ctx.stroke();
+        ctx.globalAlpha /= ease(pIn) || 1;
+      }
+      // Koopman slides out from last week's value to its forecast
+      if (kIn > 0) {
+        const x = lerp(fcX(r.p), fcX(r.k), ease(kIn));
+        ctx.beginPath(); ctx.arc(x, y - 9, 7.5, 0, 7); ctx.fillStyle = rgb(T.accent); ctx.fill();
+        if (kIn < 1) { ctx.strokeStyle = rgb(T.accent, 0.35); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(fcX(r.p), y - 9); ctx.lineTo(x, y - 9); ctx.stroke(); }
+      }
+      // the real value drops in, with a ripple when it lands
+      if (aIn > 0) {
+        const yy = y - 46 * (1 - ease(aIn));
+        ctx.beginPath(); ctx.arc(fcX(r.act), yy, 9.5, 0, 7); ctx.fillStyle = rgb(T.pos); ctx.fill(); ctx.strokeStyle = rgb(T.surface); ctx.lineWidth = 2.5; ctx.stroke();
+        if (si === 3 && aIn >= 1 && !reduceMotion) {
+          const k2 = clamp(t - 0.3 - i * 0.35 - 0.5, 0, 0.8) / 0.8;
+          if (k2 < 1) { ctx.beginPath(); ctx.arc(fcX(r.act), y, 10 + k2 * 22, 0, 7); ctx.strokeStyle = rgb(T.pos, 0.5 * (1 - k2)); ctx.lineWidth = 2; ctx.stroke(); }
+        }
+      }
+      ctx.restore();
     });
-    if (n) {
-      ctx.textAlign = "left"; ctx.font = "500 13.5px Geist, Inter, system-ui, sans-serif"; ctx.fillStyle = rgb(T.muted);
-      ctx.fillText(`Average miss this week: Koopman ${(errK / n * 100).toFixed(1)} points · same as last week ${(errP / n * 100).toFixed(1)} points`, 40, H - 22);
+    // the week's score
+    if (si >= 5 && !verdict) {
+      const s = weekScore(w), a = ease(t / 0.5);
+      ctx.save(); ctx.globalAlpha = a; ctx.textAlign = "left"; ctx.font = "600 15px Geist, Inter, system-ui, sans-serif";
+      ctx.fillStyle = rgb(T.muted); ctx.fillText("Average miss this week:", 40, H - 22);
+      ctx.fillStyle = rgb(T.accent); ctx.fillText(`Koopman ${s.k} pts`, 230, H - 22);
+      ctx.fillStyle = rgb(T.ink); ctx.fillText(`same as last week ${s.p} pts`, 380, H - 22);
+      ctx.restore();
+    }
+    ctx.restore();
+    // verdict card over the dimmed chart
+    if (verdict) {
+      const a = ease(t / 0.6);
+      ctx.save(); ctx.globalAlpha = a;
+      ctx.shadowColor = "rgba(40,30,70,0.16)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 8;
+      roundRect(230, 200, 540, 220, 22); ctx.fillStyle = rgb(T.surface); ctx.fill(); ctx.shadowColor = "transparent";
+      ctx.textAlign = "center"; ctx.fillStyle = rgb(T.muted); ctx.font = "600 13px Geist, Inter, system-ui, sans-serif";
+      ctx.fillText(`AVERAGE MISS OVER ${FC_WEEKS.length} HELD-OUT WEEKS (RMSE, POINTS)`, 500, 238);
+      ctx.font = "750 56px Geist, Inter, system-ui, sans-serif"; ctx.fillStyle = rgb(T.accent); ctx.fillText((rmseOf(MODEL) * 100).toFixed(1), 380, 318);
+      ctx.fillStyle = rgb(T.ink); ctx.fillText((rmseOf("persistence") * 100).toFixed(1), 620, 318);
+      ctx.font = "500 14px Geist, Inter, system-ui, sans-serif"; ctx.fillStyle = rgb(T.muted);
+      ctx.fillText("Koopman", 380, 346); ctx.fillText("same as last week", 620, 346);
+      ctx.font = "700 18px Geist, Inter, system-ui, sans-serif"; ctx.fillStyle = rgb(T.ink); ctx.fillText("vs", 500, 306);
+      ctx.font = "650 16px Geist, Inter, system-ui, sans-serif"; ctx.fillText("A tie: no clear win over the simplest guess.", 500, 392);
+      ctx.restore();
     }
   }
 
@@ -889,7 +987,7 @@
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
     if (S.scene === 0) drawHospital(clock, dt);
     else if (S.scene === 1) drawContacts(clock, dt);
-    else if (S.scene === 2) drawForecast();
+    else if (S.scene === 2) drawForecast(clock, dt);
     else drawNetwork(clock);
     drawFade(dt);
     requestAnimationFrame(frame);
@@ -985,8 +1083,9 @@
     $("progressFill").style.width = ((S.pos + part) / SCENES.length * 100).toFixed(1) + "%";
   }
   function go(i) {
-    S.pos = clamp(i, 0, SCENES.length - 1); S.scene = SCENES[S.pos].id; S.playing = (S.scene === 0 || S.scene === 1) && !reduceMotion; S.playAcc = 0;
+    S.pos = clamp(i, 0, SCENES.length - 1); S.scene = SCENES[S.pos].id; S.playing = (S.scene === 0 || S.scene === 1 || S.scene === 2) && !reduceMotion; S.playAcc = 0;
     if (S.scene === 1) csReset();
+    if (S.scene === 2) Object.assign(FS, { wi: Math.max(0, FC_WEEKS.indexOf(13)), i: 0, t: 0 }), S.fcWeek = FC_WEEKS[FS.wi];
     S.hover = null; $("tip").hidden = true;
     if (S.scene === STORY) { SS.step = 0; SS.acc = 0; SS.since = 0; SS.playing = true; }
     $("legend").hidden = S.scene === STORY || S.scene === 2;
@@ -1059,9 +1158,13 @@
       <input type="range" class="seq-slider" id="wkSlider" min="0" max="${D.weeks.length - 1}" value="${S.week}" aria-label="Week">`;
   }
   function forecastBar() {
-    const wks = [...new Set(D.forecast.points.map((p) => p.landing_week))].sort((a, b) => a - b);
-    return `<span class="bar-label">Week</span><div class="chips">${wks.map((w) => `<button class="chip ${w === S.fcWeek ? "on" : ""}" data-fw="${w}">${w}</button>`).join("")}</div>
-      <span class="bar-hint" style="margin-left:auto">Click a ward to chart it</span>`;
+    const prev = `<svg viewBox="0 0 24 24" width="18" height="18"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const next = `<svg viewBox="0 0 24 24" width="18" height="18"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    return `<button class="play ghost-btn" id="fsPrev" aria-label="Previous step">${prev}</button>
+      <button class="play" id="playBtn" aria-label="Play or pause">${playIcon()}</button>
+      <button class="play ghost-btn" id="fsNext" aria-label="Next step">${next}</button>
+      <div class="seq-cap"><span class="seq-step" id="seqStep">${FS.i < FSTEPS.length ? `${FS.i + 1} / ${FSTEPS.length}` : "verdict"}</span><span id="seqCaption">${fsStep().cap(S.fcWeek, weekScore(S.fcWeek))}</span></div>
+      <div class="chips">${FC_WEEKS.map((w) => `<button class="chip ${w === S.fcWeek ? "on" : ""}" data-fw="${w}">${w}</button>`).join("")}</div>`;
   }
   function interventionBar() {
     return `<span class="bar-label">Wards</span><div class="chips">${[1, 2].map((k) => `<button class="chip ${k === S.k ? "on" : ""}" data-k="${k}">${k}</button>`).join("")}</div>
@@ -1084,7 +1187,11 @@
     if (pb) pb.onclick = () => { S.playing = !S.playing; pb.innerHTML = playIcon(); };
     const sl = $("wkSlider");
     if (sl) { sl.oninput = () => { S.week = +sl.value; S.playing = false; $("playBtn").innerHTML = playIcon(); syncWeekUI(); }; syncWeekUI(); }
-    document.querySelectorAll("[data-fw]").forEach((b) => b.onclick = () => { S.fcWeek = +b.dataset.fw; renderBar(); renderPanel(false); });
+    document.querySelectorAll("[data-fw]").forEach((b) => b.onclick = () => { fsGo(FC_WEEKS.indexOf(+b.dataset.fw), 0); });
+    if ($("fsPrev")) {
+      $("fsPrev").onclick = () => { S.playing = false; $("playBtn").innerHTML = playIcon(); fsGo(FS.wi, FS.i - 1); };
+      $("fsNext").onclick = () => { S.playing = false; $("playBtn").innerHTML = playIcon(); fsGo(FS.wi, FS.i + 1); };
+    }
     document.querySelectorAll("[data-k]").forEach((b) => b.onclick = () => { S.k = +b.dataset.k; renderBar(); renderPanel(false); });
     document.querySelectorAll("[data-r]").forEach((b) => b.onclick = () => { S.R = +b.dataset.r; renderBar(); renderPanel(false); });
   }
