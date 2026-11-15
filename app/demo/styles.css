@@ -316,6 +316,15 @@ body.embed .sdot.on, body.embed .sdot.done { background: var(--accent); }
 body.embed .hbar.top .hb-fill { background: linear-gradient(90deg, var(--pos), #f7b2a6); }
 body.embed .strat.on .fill, body.embed .mini-bar { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
 
+/* spreading-scene legend dots and the weekly flow counters */
+.dot.burst { background: var(--pos); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--pos-soft), 0 0 0 5px var(--pos); }
+.dot.clr { background: var(--safe); }
+.dot.first { background: var(--pos); outline: 1.5px dashed var(--pos); outline-offset: 2px; }
+.flow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 14px; }
+.flow div { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); }
+.flow b { font-size: 30px; font-weight: 750; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.flow span { font-size: 12px; color: var(--muted); line-height: 1.35; }
+
 /* legend icons for the ward network */
 .lg-node { width: 12px; height: 12px; border-radius: 50%; display: inline-block; background: var(--surface); box-shadow: 0 0 0 1.5px var(--line-strong); }
 .lg-ring { width: 12px; height: 12px; border-radius: 50%; display: inline-block; border: 3px solid var(--accent); border-right-color: var(--line); }

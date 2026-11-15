@@ -137,6 +137,17 @@ def story():
             "n_chains": int(su["n_chains_found"]), "n_cross_ward": int(su["n_cross_ward_chains"])}
 
 
+def transitions():
+    """Week-to-week MRSA transitions per ward (src/transitions.py): counts of
+    new / still / first / cleared / negative among the people tested that week."""
+    t = pd.read_csv(TABLES / "demo_weekly_transitions.csv")
+    out = {}
+    for _, r in t.iterrows():
+        out.setdefault(str(int(r["week"])), {})[r["group"]] = {
+            k: int(r[k]) for k in ["new", "still", "first", "cleared", "negative", "tested"]}
+    return out
+
+
 def build_demo_data():
     """Collect everything the demo page needs into one dict."""
     params = pd.read_csv(TABLES / "p4_calibrated_params.csv").iloc[0]
@@ -153,6 +164,7 @@ def build_demo_data():
         "params": {k: _clean(params[k]) for k in ["beta", "gamma", "epsilon"]},
         "calibration_weeks": config.CALIBRATION_WEEKS,
         "story": story(),
+        "transitions": transitions(),
     }
 
 

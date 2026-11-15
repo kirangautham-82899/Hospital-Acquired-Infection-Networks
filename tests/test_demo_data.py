@@ -89,3 +89,18 @@ def test_demo_html_is_self_contained():
     assert 'href="styles.css"' not in html and 'src="demo.js"' not in html and 'src="demo_data.js"' not in html
     assert "window.DEMO_DATA = " in html and '<body class="embed">' in html
     assert html.count("<script>") == 3  # start-scene settings, data, script
+
+
+def test_transitions_add_up_to_p3(data):
+    """Second method for the spreading scene: per ward-week, the transition
+    classes must add up to P3's tested and positive counts."""
+    for r in _rows("p3_states_real.csv"):
+        t = data["transitions"][r["week"]][r["group"]]
+        assert sum(t[k] for k in ["new", "still", "first", "cleared", "negative"]) == t["tested"] == int(r["n_tested"])
+        assert t["new"] + t["still"] + t["first"] == int(r["n_positive"])
+
+
+def test_transitions_hand_check(data):
+    """Hospital-wide totals over all weeks (printed by `python -m src.transitions`)."""
+    tot = {k: sum(g[k] for wk in data["transitions"].values() for g in wk.values()) for k in ["new", "cleared"]}
+    assert tot == {"new": 229, "cleared": 233}

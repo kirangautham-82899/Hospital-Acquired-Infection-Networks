@@ -56,24 +56,41 @@
   const linkMax = Math.max(...D.contacts.links.map((l) => l.hours));
 
   // ---------- layouts (canvas is 1000 x 640 units) ----------
-  // Hospital: one card per ward, 3 x 2; each card shows 10 people tested there.
+  // Hospital: one card per ward, 3 x 2.
   const ROOM = {};
   const cols = [24, 350, 676], RW = 300, RH = 290;
   G.forEach((g, i) => { ROOM[g] = { g, x: cols[i % 3], y: i < 3 ? 22 : 328, w: RW, h: RH }; });
-  const PER_CARD = 10;
-  const icons = [];
+  // One small figure per person swabbed that week (real counts, src/transitions.py).
+  // Classes: still / first / new carry MRSA, cleared = carried at the previous swab, negative = no MRSA.
+  const TR = D.transitions || {}; // older demo_data.js without transitions: cards show "nobody swabbed"
+  const trOf = (w, g) => (TR[String(w)] || {})[g] || null;
+  const ORDER = ["still", "first", "new", "cleared", "negative"];
+  const DOT = { cols: 12, dx: 21.5, dy: 27, x0: 30, y0: 112 };
+  const pool = {};
   G.forEach((g) => {
-    const r = ROOM[g];
-    for (let k = 0; k < PER_CARD; k++) {
-      const col = k % 5, row = Math.floor(k / 5);
-      icons.push({
-        g, rank: k, role: k % 3 === 2 ? "staff" : "patient", scale: 2.15,
-        x: r.x + 46 + col * 52, y: r.y + 150 + row * 92, c: 0, u: 0, alpha: 1,
-        phase: rr(0, 6.28), blink: rr(1, 5), dir: rand() < 0.5 ? -1 : 1, turnT: rr(2, 8),
-        skin: "skin" + (1 + Math.floor(rand() * 4)), hairStyle: Math.floor(rand() * 3), moving: false,
-      });
-    }
+    const cap = Math.max(...D.weeks.map((_, w) => (trOf(w, g) || { tested: 0 }).tested));
+    pool[g] = [...Array(cap).keys()].map(() => ({ x: 0, y: 0, tx: 0, ty: 0, a: 0, col: null, kind: "negative", pre: "negative", at: 0, show: false }));
   });
+  let weekShown = -1;
+  function stageWeek(now) {
+    G.forEach((g) => {
+      const t = trOf(S.week, g), r = ROOM[g], list = [];
+      if (t) ORDER.forEach((k) => { for (let i = 0; i < t[k]; i++) list.push(k); });
+      const seen = { new: 0, cleared: 0 };
+      pool[g].forEach((d, i) => {
+        d.show = i < list.length;
+        if (!d.show) return;
+        const k = list[i];
+        d.tx = r.x + DOT.x0 + (i % DOT.cols) * DOT.dx; d.ty = r.y + DOT.y0 + Math.floor(i / DOT.cols) * DOT.dy;
+        if (d.a < 0.05) { d.x = d.tx; d.y = d.ty; }
+        d.kind = k;
+        // the week plays in order: clears first, then the new infections burst in
+        d.pre = k === "new" ? "negative" : k === "cleared" ? "still" : k;
+        d.at = now + (k === "cleared" ? 0.45 + 0.04 * seen.cleared++ : k === "new" ? 1.1 + 0.07 * seen.new++ : 0);
+      });
+    });
+    weekShown = S.week;
+  }
 
   // Ward network: one circle per ward on a ring; used by Contacts, Superspreader, Intervention.
   const maxPeople = Math.max(...G.map((g) => D.people[g].patients + D.people[g].staff));
@@ -144,44 +161,61 @@
   // ======================================================================
   // Scene: The hospital, as "10 people per ward". Red = carries MRSA.
   // ======================================================================
+  function kindColor(k) { return k === "negative" ? T.person : k === "cleared" ? T.safe : T.pos; }
+
+  function drawPerson(d, col, alpha, sc) {
+    ctx.save(); ctx.globalAlpha = alpha; ctx.translate(d.x, d.y); ctx.scale(sc * 1.22, sc * 1.22);
+    ctx.fillStyle = rgb(col);
+    ctx.beginPath(); ctx.arc(0, -6.2, 3.6, 0, 7); ctx.fill();          // head
+    roundRect(-5, -1.6, 10, 9, 4); ctx.fill();                          // body
+    ctx.restore();
+  }
+
   function drawHospital(time) {
+    if (weekShown !== S.week) stageWeek(time);
     ctx.fillStyle = rgb(T.corridor); ctx.fillRect(0, 0, W, H);
     G.forEach((g) => {
-      const r = ROOM[g], row = weekOf(S.week).groups[g], p = row ? row.p : null;
-      const hov = S.hover === g;
+      const r = ROOM[g], t = trOf(S.week, g), row = weekOf(S.week).groups[g], hov = S.hover === g;
       ctx.save(); ctx.shadowColor = "rgba(40,30,70,0.10)"; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6;
       roundRect(r.x, r.y, r.w, r.h, 18); ctx.fillStyle = rgb(T.floor); ctx.fill(); ctx.restore();
       roundRect(r.x, r.y, r.w, r.h, 18); ctx.lineWidth = hov ? 2.5 : 1.5;
       ctx.strokeStyle = hov ? rgb(T.accent) : rgb(T.wall); if (row && row.low_n) ctx.setLineDash([6, 6]); ctx.stroke(); ctx.setLineDash([]);
-      // header
       ctx.textAlign = "left"; ctx.fillStyle = rgb(T.ink); ctx.font = "650 19px Geist, Inter, system-ui, sans-serif";
       ctx.fillText(g, r.x + 22, r.y + 38);
       ctx.fillStyle = rgb(T.muted); ctx.font = "500 12.5px Geist, Inter, system-ui, sans-serif";
-      ctx.fillText(row ? `${row.tested} people tested${row.low_n ? " · few tests" : ""}` : "nobody tested this week", r.x + 22, r.y + 60);
-      ctx.textAlign = "right";
-      if (p == null) { ctx.fillStyle = rgb(T.muted); ctx.font = "600 15px Geist, Inter, system-ui, sans-serif"; ctx.fillText("—", r.x + r.w - 22, r.y + 40); }
-      else {
-        const k = Math.round(p * PER_CARD);
-        ctx.fillStyle = k ? rgb(T.pos) : rgb(T.ink); ctx.font = "700 30px Geist, Inter, system-ui, sans-serif";
-        ctx.fillText(`${k} in ${PER_CARD}`, r.x + r.w - 22, r.y + 44);
-        ctx.fillStyle = rgb(T.muted); ctx.font = "500 12.5px Geist, Inter, system-ui, sans-serif"; ctx.fillText(pct(p) + " exactly", r.x + r.w - 22, r.y + 63);
+      ctx.fillText(t ? `${t.tested} swabbed · ${pct(row.p)} carry MRSA` : "nobody swabbed this week", r.x + 22, r.y + 60);
+      if (t) {
+        // what changed since each person's previous swab
+        let px = r.x + r.w - 20;
+        const pillR = (txt, col) => {
+          ctx.font = "700 12.5px Geist, Inter, system-ui, sans-serif"; const w = ctx.measureText(txt).width + 18;
+          px -= w; roundRect(px, r.y + 22, w, 24, 12); ctx.fillStyle = rgb(col, 0.16); ctx.fill();
+          ctx.fillStyle = rgb(col); ctx.textAlign = "left"; ctx.fillText(txt, px + 9, r.y + 38.5); px -= 6;
+        };
+        if (t.cleared) pillR(`−${t.cleared} cleared`, T.safe);
+        if (t.new) pillR(`+${t.new} new`, T.pos);
       }
     });
-    icons.forEach((f) => drawFigure(f, time));
-  }
-
-  function updateIcons(dt) {
-    icons.forEach((f) => {
-      const row = weekOf(S.week).groups[f.g], k = row ? Math.round(row.p * PER_CARD) : null;
-      const wantU = k == null ? 1 : 0, wantC = k == null ? 0 : (f.rank < k ? 1 : 0);
-      const rate = reduceMotion ? 1 : clamp(dt * 4, 0, 1);
-      f.u = lerp(f.u, wantU, rate);
-      // the colour change ripples along the row
-      f.delay = (f.c < 0.5) !== (wantC < 0.5) ? (f.delay == null ? f.rank * 0.05 : f.delay - dt) : null;
-      if (f.delay == null || f.delay <= 0) f.c = lerp(f.c, wantC, rate);
-      f.phase += dt * 2; f.blink -= dt; if (f.blink < 0) f.blink = rr(2.5, 6);
-      f.turnT -= dt; if (f.turnT < 0) { f.turnT = rr(2, 8); f.dir = -f.dir; }
-    });
+    G.forEach((g) => pool[g].forEach((d) => {
+      d.a = lerp(d.a, d.show ? 1 : 0, reduceMotion ? 1 : 0.15);
+      if (d.a < 0.02) return;
+      d.x = lerp(d.x, d.tx, 0.2); d.y = lerp(d.y, d.ty, 0.2);
+      const k = reduceMotion || time >= d.at ? d.kind : d.pre, want = kindColor(k);
+      d.col = d.col ? mix(d.col, want, reduceMotion ? 1 : 0.18) : want.slice();
+      let sc = 1;
+      if (d.kind === "new" && time >= d.at && !reduceMotion) {
+        const e = time - d.at;                      // burst: a ring expands as the person turns coral
+        if (e < 0.9) {
+          sc = 1 + 0.45 * Math.sin(Math.min(1, e / 0.35) * Math.PI);
+          ctx.beginPath(); ctx.arc(d.x, d.y - 2, 6 + e * 22, 0, 7); ctx.strokeStyle = rgb(T.pos, 0.6 * (1 - e / 0.9)); ctx.lineWidth = 2; ctx.stroke();
+        }
+      }
+      drawPerson(d, d.col, d.a, sc);
+      if (d.kind === "first" && d.a > 0.5) {         // first swab already positive: dashed halo
+        ctx.save(); ctx.setLineDash([2, 2]); ctx.beginPath(); ctx.arc(d.x, d.y - 1.5, 9.5, 0, 7);
+        ctx.strokeStyle = rgb(T.pos, 0.8); ctx.lineWidth = 1.2; ctx.stroke(); ctx.restore();
+      }
+    }));
   }
 
   // ======================================================================
@@ -623,10 +657,10 @@
     }
     if (S.playing && S.scene === 0) {
       S.playAcc += dt;
-      if (S.playAcc > 1.7) { S.playAcc = 0; S.week = (S.week + 1) % D.weeks.length; syncWeekUI(); }
+      if (S.playAcc > 3.6) { S.playAcc = 0; S.week = (S.week + 1) % D.weeks.length; syncWeekUI(); }
     }
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
-    if (S.scene === 0) { updateIcons(dt); drawHospital(clock); }
+    if (S.scene === 0) drawHospital(clock);
     else if (S.scene === 2) drawForecast();
     else drawNetwork(clock);
     drawFade(dt);
@@ -680,8 +714,8 @@
 
   // ---------- legends under the stage ----------
   const LEGEND = {
-    people: `<span><i class="dot pos"></i><b>Red = carries MRSA</b></span><span><i class="dot neg"></i>Grey = no MRSA</span>
-      <span><i class="dot ghost"></i>Faded = nobody tested</span><span class="legend-note">Each card = 10 people tested on that ward</span>`,
+    people: `<span><i class="dot pos"></i><b>Coral = carries MRSA</b></span><span><i class="dot burst"></i>Burst = caught it since last swab</span>
+      <span><i class="dot clr"></i>Mint = cleared it</span><span><i class="dot neg"></i>Grey = no MRSA</span><span><i class="dot first"></i>Dashed = first swab positive</span>`,
     1: `<span><i class="lg-node"></i>Circle = a ward (bigger = more people)</span><span><i class="lg-ring"></i>Ring = contact time kept inside</span>
       <span><i class="lg-line"></i>Line = contact between wards (thicker = more)</span>`,
     3: `<span><i class="lg-node"></i>Number = MRSA-days saved by halving that ward's contacts</span><span><i class="lg-line" style="background:var(--pos)"></i>Red lines = the #1 ward's contacts</span>`,
@@ -723,7 +757,7 @@
     $("progressFill").style.width = ((S.pos + part) / SCENES.length * 100).toFixed(1) + "%";
   }
   function go(i) {
-    S.pos = clamp(i, 0, SCENES.length - 1); S.scene = SCENES[S.pos].id; S.playing = false;
+    S.pos = clamp(i, 0, SCENES.length - 1); S.scene = SCENES[S.pos].id; S.playing = S.scene === 0 && !reduceMotion; S.playAcc = 0;
     S.hover = null; $("tip").hidden = true;
     if (S.scene === STORY) { SS.step = 0; SS.acc = 0; SS.since = 0; SS.playing = true; }
     $("legend").hidden = S.scene === STORY || S.scene === 2;
@@ -815,6 +849,7 @@
     if ($("wkDate")) $("wkDate").textContent = `from Mon ${wk.monday}`;
     if ($("wkSlider")) $("wkSlider").value = S.week;
     const ov = $("ovNow"); if (ov) ov.textContent = pct(overall[S.week]);
+    if ($("newNow")) { const t = weekTotals(S.week); $("newNow").textContent = "+" + t.new; $("clrNow").textContent = "−" + t.cleared; $("stillNow").textContent = t.still + t.first; }
     const dot = $("sparkDot"); if (dot) { const p = sparkPos(S.week); dot.setAttribute("cx", p[0]); dot.setAttribute("cy", p[1]); }
   }
 
@@ -871,14 +906,22 @@
   }
 
   // ----- scene panels: one message each -----
+  const weekTotals = (w) => {
+    const t = { new: 0, cleared: 0, still: 0, first: 0, tested: 0 };
+    G.forEach((g) => { const r = trOf(w, g); if (r) Object.keys(t).forEach((k) => { t[k] += r[k]; }); });
+    return t;
+  };
+  const allNew = D.weeks.reduce((s, _, w) => s + weekTotals(w).new, 0), allClr = D.weeks.reduce((s, _, w) => s + weekTotals(w).cleared, 0);
   function sceneHospital() {
-    const valid = overall.filter((v) => v != null), mean = valid.reduce((a, b) => a + b, 0) / valid.length;
-    return `<p class="kicker">The whole hospital</p>
-      <h2>About ${Math.round(mean * 100)}% of people tested each week carried MRSA.</h2>
-      <p>Each card shows <strong>10 people tested</strong> on one ward. <strong>Red ones carry MRSA.</strong> Press play to watch the weeks go by.</p>
-      <div class="big-wrap"><span class="big-number" id="ovNow" style="color:var(--pos)">${pct(overall[S.week])}</span><span>tested positive<br>in the week shown</span></div>
+    const t = weekTotals(S.week);
+    return `<p class="kicker">The whole hospital, week by week</p>
+      <h2>MRSA never sits still: people catch it and clear it every week.</h2>
+      <p>Each figure is <strong>one person swabbed</strong> that week. Watch each week play out: some <strong style="color:var(--safe)">clear it</strong>, then new carriers <strong style="color:var(--pos)">burst in</strong>.</p>
+      <div class="flow"><div><b id="newNow" style="color:var(--pos)">+${t.new}</b><span>caught MRSA since<br>their last swab</span></div>
+        <div><b id="clrNow" style="color:var(--safe)">−${t.cleared}</b><span>cleared it since<br>their last swab</span></div>
+        <div><b id="stillNow">${t.still + t.first}</b><span>still or already<br>carrying</span></div></div>
       ${sparkline()}
-      <p class="fine">Dashed card = only a few people tested that week. Gaps are never filled in.</p>`;
+      <p class="fine">Over all ${D.weeks.length} weeks: <b>${allNew}</b> people caught MRSA and <b>${allClr}</b> cleared it, so the level stayed roughly steady. That balance is what our SIS model reproduces. A "new" carrier may also be a positive the previous swab missed.</p>`;
   }
 
   function sceneContacts() {
