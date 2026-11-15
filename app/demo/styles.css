@@ -286,12 +286,27 @@ body.embed .play.ghost-btn { background: var(--surface); color: var(--ink); }
 body.embed .chip.on { box-shadow: 0 0 0 1px var(--line-strong); }
 body.embed .strat.on { box-shadow: none; }
 body.embed .legend { border-top-color: var(--line); }
-body.embed { --surface: #ffffff; --surface-2: #fafafa; --ink: #171717; --muted: #6f6f6f; --line: #eaeaea; --line-strong: #d4d4d4;
-  --floor: #ffffff; --floor-tile: #f4f4f4; --corridor: #f5f5f5; --wall: #d9d9d9; }
-@media (prefers-color-scheme: dark) {
-  body.embed { --surface: #0a0a0a; --surface-2: #111111; --ink: #ededed; --muted: #a1a1a1; --line: #222222; --line-strong: #333333;
-    --floor: #111111; --floor-tile: #161616; --corridor: #0a0a0a; --wall: #2e2e2e; }
+/* pastel palette shared with the app: lavender = Koopman, coral = MRSA, mint = protection */
+body.embed {
+  --surface: #ffffff; --surface-2: #faf7fd; --ink: #2a2735; --ink-2: #4a4558; --muted: #7a7487; --line: #ece6ef; --line-strong: #ddd5e6;
+  --floor: #fffdfb; --floor-tile: #f5f0f8; --corridor: #f6f1f8; --wall: #ddd3e6;
+  --accent: #7c6cf0; --accent-2: #a093f6; --accent-soft: rgba(124, 108, 240, .13);
+  --pos: #ef7f73; --pos-soft: rgba(239, 127, 115, .16); --safe: #3fb48f;
+  --person: #c9c2d6; --cap: #8c83a3; --unk: #ddd7e6;
 }
+@media (prefers-color-scheme: dark) {
+  body.embed {
+    --surface: #1d1a26; --surface-2: #221e2d; --ink: #ece9f5; --ink-2: #cfcade; --muted: #a29db3; --line: #2b2737; --line-strong: #3a354a;
+    --floor: #221e2d; --floor-tile: #27233a; --corridor: #1a1723; --wall: #3d3750;
+    --accent: #a99cff; --accent-2: #c3b9ff; --accent-soft: rgba(169, 156, 255, .16);
+    --pos: #ff9e95; --pos-soft: rgba(255, 158, 149, .16); --safe: #7fdcbf;
+    --person: #5d5672; --cap: #a69ec0; --unk: #3d3750;
+  }
+}
+body.embed .play { background: var(--accent); color: #fff; }
+body.embed .sdot.on, body.embed .sdot.done { background: var(--accent); }
+body.embed .hbar.top .hb-fill { background: linear-gradient(90deg, var(--pos), #f7b2a6); }
+body.embed .strat.on .fill, body.embed .mini-bar { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
 
 /* ===== Presentation mode ===== */
 body.present .foot, body.present .sub, body.present .progress { display: none; }

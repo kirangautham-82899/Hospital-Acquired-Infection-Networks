@@ -24,9 +24,10 @@ import streamlit.components.v1 as components  # noqa: E402
 import config  # noqa: E402
 from src import app_data as ad  # noqa: E402
 
-ACCENT = "#3b57d6"     # the Koopman model
-HIGHLIGHT = "#e4553a"  # MRSA / the ward in focus
-MUTED = "rgba(140, 146, 156, 0.55)"
+# Pastel palette (matches app/streamlit_style.css): lavender = Koopman, coral = MRSA, mint = protection
+ACCENT = "#7c6cf0"     # lavender: the Koopman model
+HIGHLIGHT = "#ef7f73"  # coral: MRSA / the ward in focus
+MUTED = "rgba(150, 143, 170, 0.5)"
 FONT = "Geist, Inter, system-ui, sans-serif"
 
 # (title, one-line lede, demo scene number or None). Demo scene order:
@@ -129,7 +130,7 @@ if title == "Who meets whom":
     with left:
         fig = px.imshow(
             W.to_numpy(), x=list(W.columns), y=list(W.index), text_auto=".0%", zmin=0, zmax=1, aspect="auto",
-            color_continuous_scale=[[0, "rgba(59,87,214,0.04)"], [0.25, "rgba(59,87,214,0.35)"], [1, ACCENT]],
+            color_continuous_scale=[[0, "rgba(124,108,240,0.05)"], [0.25, "rgba(124,108,240,0.35)"], [1, ACCENT]],
             labels=dict(x="Contact time spent with", y="People in", color="Share"),
         )
         fig.update_layout(coloraxis_showscale=False, hovermode="closest")
@@ -166,9 +167,9 @@ elif title == "Takeaways":
     n_weeks = states["week"].nunique()
     cards = [
         ("MRSA in a typical week", f"{mean_prev:.0%}", "of people tested", "pos"),
-        ("Forecast error, 1 week", f"{rmse['koopman'] * 100:.1f} vs {rmse['persistence'] * 100:.1f}", "Koopman vs last week: a tie", ""),
+        ("Forecast error, 1 week", f"{rmse['koopman'] * 100:.1f} vs {rmse['persistence'] * 100:.1f}", "Koopman vs last week: a tie", "acc"),
         ("Ward to protect first", top["ward"], f"{top['ground_truth_drop']:.0f} MRSA-days saved by halving its contacts", "safe"),
-        ("Ranking agreement", f"{agree['koopman']:.2f} vs {agree['contacts']:.2f}", "Koopman vs plain contact counts", ""),
+        ("Ranking agreement", f"{agree['koopman']:.2f} vs {agree['contacts']:.2f}", "Koopman vs plain contact counts", "acc"),
     ]
     st.markdown('<div class="tk-grid">' + "".join(
         f'<div class="tk {tone}"><span>{label}</span><b>{value}</b><small>{note}</small></div>'

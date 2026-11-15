@@ -1,30 +1,32 @@
-# Next.js-style neutrals; data colours (blue = Koopman, red = MRSA) live in the
-# charts and the embedded scenes. No `base`: follows the viewer's light/dark setting.
+# Pastel palette built on the project's three roles:
+#   lavender = the Koopman model, coral = MRSA, mint = protection / the safe outcome.
+# Cream and lavender surfaces in light mode, deep plum in dark. No `base`:
+# follows the viewer's light/dark setting.
 [theme]
-baseRadius = "0.5rem"
+baseRadius = "0.75rem"
 showWidgetBorder = true
 
 [theme.light]
-primaryColor = "#171717"
-backgroundColor = "#fafafa"
+primaryColor = "#7c6cf0"
+backgroundColor = "#fbf8f5"
 secondaryBackgroundColor = "#ffffff"
-textColor = "#171717"
-borderColor = "#eaeaea"
-linkColor = "#171717"
+textColor = "#2a2735"
+borderColor = "#ece6ef"
+linkColor = "#7c6cf0"
 
 [theme.dark]
-primaryColor = "#ededed"
-backgroundColor = "#000000"
-secondaryBackgroundColor = "#0a0a0a"
-textColor = "#ededed"
-borderColor = "#1f1f1f"
-linkColor = "#ededed"
+primaryColor = "#a99cff"
+backgroundColor = "#16141d"
+secondaryBackgroundColor = "#1d1a26"
+textColor = "#ece9f5"
+borderColor = "#2b2737"
+linkColor = "#a99cff"
 
 [theme.light.sidebar]
-backgroundColor = "#ffffff"
+backgroundColor = "#f4effb"
 
 [theme.dark.sidebar]
-backgroundColor = "#0a0a0a"
+backgroundColor = "#1a1723"
 
 [client]
 toolbarMode = "minimal"      # no Deploy button or developer menu
