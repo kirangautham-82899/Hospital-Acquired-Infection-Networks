@@ -395,16 +395,6 @@
         }
       }
     });
-    // labels for the three busiest links (contacts scene only)
-    if (S.scene === 1) {
-      [...D.contacts.links].sort((a, b) => b.hours - a.hours).slice(0, 3).forEach((l) => {
-        const [mx, my] = linkPoint(l, 0.5), label = fmt(l.hours) + " h";
-        ctx.font = "600 12px Geist, Inter, system-ui, sans-serif"; const tw = ctx.measureText(label).width + 16;
-        roundRect(mx - tw / 2, my - 11, tw, 22, 11); ctx.fillStyle = rgb(T.surface); ctx.fill();
-        ctx.strokeStyle = rgb(T.accent, 0.45); ctx.lineWidth = 1; ctx.stroke();
-        ctx.fillStyle = rgb(T.ink); ctx.textAlign = "center"; ctx.fillText(label, mx, my + 4);
-      });
-    }
     // centre caption: intervention result
     if (S.scene === 4) {
       const r = interRow(S.strategy);
@@ -433,20 +423,12 @@
     ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, 7); ctx.fillStyle = rgb(T.surface); ctx.fill(); ctx.restore();
     if (S.scene === 3) { ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, 7); ctx.fillStyle = rgb(T.pos, 0.08 + 0.32 * sup.drop / dropMax); ctx.fill(); }
     // ring: share of contact time spent inside the ward
-    const share = D.contacts.within_share[g], rr2 = n.r + 7, shielded = S.scene === 4 && tw.includes(g) && S.strategy !== "whole_hospital";
+    const rr2 = n.r + 7, shielded = S.scene === 4 && tw.includes(g) && S.strategy !== "whole_hospital";
     ctx.lineCap = "round"; ctx.lineWidth = 6;
-    if (S.scene === 1) {
-      ctx.beginPath(); ctx.arc(n.x, n.y, rr2, 0, 7); ctx.strokeStyle = rgb(T.line); ctx.stroke();
-      n.ring = n.ring == null ? 0 : lerp(n.ring, share, reduceMotion ? 1 : 0.06);
-      ctx.beginPath(); ctx.arc(n.x, n.y, rr2, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * n.ring); ctx.strokeStyle = rgb(T.accent); ctx.stroke();
-    } else n.ring = 0;
     if (shielded) { ctx.beginPath(); ctx.arc(n.x, n.y, rr2, 0, 7); ctx.strokeStyle = rgb(T.safe); ctx.stroke(); }
     // contents
     ctx.textAlign = "center"; ctx.fillStyle = rgb(T.ink);
-    if (S.scene === 1) {
-      ctx.font = "700 20px Geist, Inter, system-ui, sans-serif"; ctx.fillText(pct(share), n.x, n.y + 3);
-      ctx.fillStyle = rgb(T.muted); ctx.font = "500 10.5px Geist, Inter, system-ui, sans-serif"; ctx.fillText("inside", n.x, n.y + 18);
-    } else if (S.scene === 3) {
+    if (S.scene === 3) {
       ctx.fillStyle = g === topSpreadWard ? rgb(T.pos) : rgb(T.ink); ctx.font = "700 20px Geist, Inter, system-ui, sans-serif"; ctx.fillText(fmt(sup.drop), n.x, n.y + 3);
       ctx.fillStyle = rgb(T.muted); ctx.font = "500 10.5px Geist, Inter, system-ui, sans-serif"; ctx.fillText("days saved", n.x, n.y + 18);
     } else {
@@ -465,6 +447,115 @@
     if (S.scene === 4 && tw.includes(g) && S.strategy !== "whole_hospital") drawShield(n.x + n.r * 0.78, n.y - n.r * 0.78);
     ctx.restore();
     void below;
+  }
+
+  // ======================================================================
+  // Contacts scene: one idea per step (all numbers from the P2 contact data).
+  // ======================================================================
+  const ws = (g) => D.contacts.within_share[g];
+  const topLinks = [...D.contacts.links].sort((a, b) => b.hours - a.hours);
+  const insideTotal = G.reduce((s, g) => s + D.contacts.inside_hours[g], 0);
+  const insideShare = insideTotal / (insideTotal + 2 * D.contacts.links.reduce((s, l) => s + l.hours, 0));
+  const mostInside = [...G].sort((a, b) => ws(b) - ws(a))[0];
+  const leastInside = [...G].sort((a, b) => ws(a) - ws(b))[0];
+  const bridgeLinks = D.contacts.links.filter((l) => l.a === leastInside || l.b === leastInside).sort((a, b) => b.hours - a.hours);
+  const otherEnd = (l, g) => (l.a === g ? l.b : l.a);
+  const CSTEPS = [
+    { dur: 3.6, focus: G, rings: [], links: () => [], cap: `Six groups. Each circle is a ward; <b>bigger</b> means more people.` },
+    { dur: 3.8, focus: [mostInside], rings: [mostInside], links: () => [], cap: `<b>${mostInside}</b> keeps <b>${pct(ws(mostInside))}</b> of its contact time inside the ward.` },
+    { dur: 3.8, focus: [leastInside], rings: [mostInside, leastInside], links: () => [], cap: `The staff-only <b>${leastInside}</b> group keeps just <b>${pct(ws(leastInside))}</b>.` },
+    { dur: 3.4, focus: G, rings: G, links: () => [], cap: `All the rings together: <b>most contact never leaves the ward</b>.` },
+    ...topLinks.slice(0, 3).map((l, i) => ({
+      dur: 5, focus: [l.a, l.b], rings: G, links: () => topLinks.slice(0, i + 1), walk: l,
+      cap: `${["The busiest link", "The second busiest", "The third"][i]}: <b>${l.a} ↔ ${l.b}</b>, <b>${fmt(l.hours)} contact-hours</b> over the study.`,
+    })),
+    {
+      dur: 5.4, focus: [leastInside, ...bridgeLinks.map((l) => otherEnd(l, leastInside))], rings: G, bridge: true,
+      links: (t) => topLinks.slice(0, 3).concat(bridgeLinks.slice(0, Math.max(0, Math.floor((t - 0.4) / 0.55) + 1))),
+      cap: `<b>${leastInside}</b> staff touch every ward: they are the <b>bridges</b> between wards.`,
+    },
+    { dur: 5.4, focus: G, rings: G, links: () => D.contacts.links, flow: true,
+      cap: `<b>${Math.round(insideShare * 100)}%</b> of all contact stays inside a ward. MRSA can only cross along these lines.` },
+  ];
+  const CS = { i: 0, t: 0 };
+  const walkerFig = { role: "staff", scale: 1.55, x: 0, y: 0, c: 0, m: 0, u: 0, alpha: 1, rank: 3, phase: 0, blink: 3, dir: 1, skin: "skin2", hairStyle: 0, moving: true };
+
+  function csGo(i) {
+    CS.i = (i + CSTEPS.length) % CSTEPS.length; CS.t = 0;
+    const el = $("seqCaption"); if (el) { el.innerHTML = CSTEPS[CS.i].cap; el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
+    const st = $("seqStep"); if (st) st.textContent = `${CS.i + 1} / ${CSTEPS.length}`;
+  }
+  function csReset() { CS.i = 0; CS.t = 0; G.forEach((g) => { NODE[g].ring = 0; NODE[g].fa = 0; }); D.contacts.links.forEach((l) => { l.vis = 0; }); }
+
+  function drawContacts(time, dt) {
+    const step = CSTEPS[CS.i];
+    if (S.playing) { CS.t += dt; if (CS.t > step.dur) csGo(CS.i + 1); }
+    const shown = new Set(step.links(CS.t).map((l) => l.a + "|" + l.b));
+    const k = reduceMotion ? 1 : clamp(dt * 4, 0, 1);
+    ctx.fillStyle = rgb(T.corridor); ctx.fillRect(0, 0, W, H);
+    const grd = ctx.createRadialGradient(500, 326, 20, 500, 326, 360);
+    grd.addColorStop(0, rgb(T.accent, 0.07)); grd.addColorStop(1, rgb(T.accent, 0)); ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
+
+    // links: appear one by one; the current one is bold, earlier ones settle back
+    [...D.contacts.links].sort((a, b) => a.hours - b.hours).forEach((l) => {
+      l.vis = lerp(l.vis || 0, shown.has(l.a + "|" + l.b) ? 1 : 0, k);
+      if (l.vis < 0.02) return;
+      const cur = step.walk === l || (step.bridge && (l.a === leastInside || l.b === leastInside));
+      const t = l.hours / linkMax, A = NODE[l.a], B = NODE[l.b], [, , cx, cy] = linkPoint(l, 0);
+      let a = (0.18 + 0.5 * t) * l.vis * (cur ? 1.4 : 1);
+      if (S.hover && l.a !== S.hover && l.b !== S.hover) a *= 0.3;
+      ctx.strokeStyle = rgb(T.accent, Math.min(0.95, a)); ctx.lineWidth = (1.5 + 11 * t) * (cur ? 1.15 : 1); ctx.lineCap = "round";
+      // the current link draws itself from A to B
+      const p = step.walk === l ? clamp((CS.t - 0.3) / 1.2, 0, 1) : 1;
+      ctx.beginPath(); ctx.moveTo(A.x, A.y);
+      if (p >= 1) ctx.quadraticCurveTo(cx, cy, B.x, B.y);
+      else for (let s = 1; s <= 24; s++) { const [x, y] = linkPoint(l, p * s / 24); ctx.lineTo(x, y); }
+      ctx.stroke();
+      if (step.flow && !reduceMotion) {
+        const n = Math.max(1, Math.round(0.5 + 2.5 * t));
+        for (let j = 0; j < n; j++) { const [px, py] = linkPoint(l, (time * 0.12 + j / n + l.hours * 0.001) % 1); ctx.fillStyle = rgb(T.accent, 0.8); ctx.beginPath(); ctx.arc(px, py, 2.4 + t * 2, 0, 7); ctx.fill(); }
+      }
+    });
+    // hour labels for the busiest links once revealed (the current one counts up)
+    topLinks.slice(0, 3).forEach((l) => {
+      if ((l.vis || 0) < 0.5) return;
+      const cur = step.walk === l, v = cur ? l.hours * clamp((CS.t - 0.3) / 2.2, 0, 1) : l.hours;
+      const [mx, my] = linkPoint(l, 0.5), label = fmt(v) + " h";
+      ctx.font = `${cur ? 700 : 600} ${cur ? 14 : 12}px Geist, Inter, system-ui, sans-serif`; const w = ctx.measureText(label).width + 16;
+      roundRect(mx - w / 2, my - 12, w, 24, 12); ctx.fillStyle = cur ? rgb(T.accent) : rgb(T.surface); ctx.fill();
+      ctx.strokeStyle = rgb(T.accent, 0.45); ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = cur ? "#fff" : rgb(T.ink); ctx.textAlign = "center"; ctx.fillText(label, mx, my + 4.5);
+    });
+    // one staff member walks the current link, A to B
+    if (step.walk) {
+      const p = clamp((CS.t - 0.6) / (step.dur - 1.6), 0, 1), [x, y] = linkPoint(step.walk, p), [x2] = linkPoint(step.walk, Math.min(1, p + 0.02));
+      walkerFig.x = x; walkerFig.y = y + 10; walkerFig.dir = x2 >= x ? 1 : -1; walkerFig.moving = p > 0 && p < 1; walkerFig.phase += dt * 11;
+      walkerFig.blink -= dt; if (walkerFig.blink < 0) walkerFig.blink = rr(2, 5);
+    }
+    // wards
+    G.forEach((g) => {
+      const n = NODE[g], focus = (step.focus.includes(g) && !S.hover) || S.hover === g;
+      n.fa = lerp(n.fa == null ? 0 : n.fa, focus ? 1 : 0.4, k);
+      n.ring = lerp(n.ring || 0, step.rings.includes(g) ? ws(g) : 0, reduceMotion ? 1 : clamp(dt * 2.2, 0, 1));
+      ctx.save(); ctx.globalAlpha = n.fa;
+      ctx.save(); ctx.shadowColor = "rgba(40,30,70,0.16)"; ctx.shadowBlur = 20; ctx.shadowOffsetY = 6;
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, 7); ctx.fillStyle = rgb(T.surface); ctx.fill(); ctx.restore();
+      const rr2 = n.r + 7; ctx.lineCap = "round"; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.arc(n.x, n.y, rr2, 0, 7); ctx.strokeStyle = rgb(T.line); ctx.stroke();
+      if (n.ring > 0.005) { ctx.beginPath(); ctx.arc(n.x, n.y, rr2, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * n.ring); ctx.strokeStyle = rgb(T.accent); ctx.stroke(); }
+      ctx.textAlign = "center";
+      if (step.rings.includes(g)) {
+        ctx.fillStyle = rgb(T.ink); ctx.font = "700 20px Geist, Inter, system-ui, sans-serif"; ctx.fillText(pct(n.ring), n.x, n.y + 3);
+        ctx.fillStyle = rgb(T.muted); ctx.font = "500 10.5px Geist, Inter, system-ui, sans-serif"; ctx.fillText("inside", n.x, n.y + 18);
+      } else {
+        const pp = D.people[g];
+        ctx.fillStyle = rgb(T.ink); ctx.font = "700 20px Geist, Inter, system-ui, sans-serif"; ctx.fillText(pp.patients + pp.staff, n.x, n.y + 3);
+        ctx.fillStyle = rgb(T.muted); ctx.font = "500 10.5px Geist, Inter, system-ui, sans-serif"; ctx.fillText("people", n.x, n.y + 18);
+      }
+      ctx.fillStyle = rgb(T.ink); ctx.font = "650 15px Geist, Inter, system-ui, sans-serif"; ctx.fillText(g, n.x, n.y + (n.y < 200 ? -(n.r + 20) : n.r + 30));
+      ctx.restore();
+    });
+    if (step.walk) drawFigure(walkerFig, time);
   }
 
   // ======================================================================
@@ -797,6 +888,7 @@
     }
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
     if (S.scene === 0) drawHospital(clock, dt);
+    else if (S.scene === 1) drawContacts(clock, dt);
     else if (S.scene === 2) drawForecast();
     else drawNetwork(clock);
     drawFade(dt);
@@ -863,7 +955,7 @@
   const SCENES = [
     { id: STORY, name: "How it spreads", render: sceneStory, bar: storyBar },
     { id: 0, name: "Hospital", render: sceneHospital, bar: spreadBar },
-    { id: 1, name: "Contacts", render: sceneContacts, bar: () => `<span class="bar-hint">Hover a ward to see only its links.</span>` },
+    { id: 1, name: "Contacts", render: sceneContacts, bar: contactsBar },
     { id: 2, name: "Forecast", render: sceneForecast, bar: forecastBar },
     { id: 3, name: "Superspreader", render: sceneSuper, bar: () => `<span class="bar-hint">The number in each circle: MRSA-days saved if that ward's contacts are halved.</span>` },
     { id: 4, name: "Intervention", render: sceneIntervention, bar: interventionBar },
@@ -893,7 +985,8 @@
     $("progressFill").style.width = ((S.pos + part) / SCENES.length * 100).toFixed(1) + "%";
   }
   function go(i) {
-    S.pos = clamp(i, 0, SCENES.length - 1); S.scene = SCENES[S.pos].id; S.playing = S.scene === 0 && !reduceMotion; S.playAcc = 0;
+    S.pos = clamp(i, 0, SCENES.length - 1); S.scene = SCENES[S.pos].id; S.playing = (S.scene === 0 || S.scene === 1) && !reduceMotion; S.playAcc = 0;
+    if (S.scene === 1) csReset();
     S.hover = null; $("tip").hidden = true;
     if (S.scene === STORY) { SS.step = 0; SS.acc = 0; SS.since = 0; SS.playing = true; }
     $("legend").hidden = S.scene === STORY || S.scene === 2;
@@ -953,6 +1046,12 @@
       <div class="slider-wrap"><input type="range" id="wkSlider" min="0" max="${n - 1}" value="${S.week}" aria-label="Week">
         <div class="phase-row"><span style="flex:${cal}">calibration weeks 0–${cal - 1}</span><span class="hold" style="flex:${n - cal}">held out ${cal}–${n - 1}</span></div></div>`;
   }
+  function contactsBar() {
+    return `<button class="play ghost-btn" id="csPrev" aria-label="Previous step"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="play" id="playBtn" aria-label="Play or pause">${playIcon()}</button>
+      <button class="play ghost-btn" id="csNext" aria-label="Next step"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div class="seq-cap"><span class="seq-step" id="seqStep">${CS.i + 1} / ${CSTEPS.length}</span><span id="seqCaption">${CSTEPS[CS.i].cap}</span></div>`;
+  }
   function spreadBar() {
     return `<button class="play" id="playBtn" aria-label="Play or pause">${playIcon()}</button>
       <div class="week-info"><b id="wkLabel"></b><span id="wkDate"></span></div>
@@ -971,6 +1070,10 @@
   const playIconPlay = () => `<svg viewBox="0 0 24 24" width="18" height="18"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>`;
   const playIconPause = () => `<svg viewBox="0 0 24 24" width="18" height="18"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg>`;
   function wireBar() {
+    if ($("csPrev")) {
+      $("csPrev").onclick = () => { S.playing = false; $("playBtn").innerHTML = playIcon(); csGo(CS.i - 1); };
+      $("csNext").onclick = () => { S.playing = false; $("playBtn").innerHTML = playIcon(); csGo(CS.i + 1); };
+    }
     if ($("storyPlay")) {
       $("storyPlay").onclick = () => { SS.playing = !SS.playing; SS.acc = 0; renderBar(); };
       $("prevStep").onclick = () => { SS.playing = false; storyGo(SS.step - 1); };
