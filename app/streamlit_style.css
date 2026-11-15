@@ -1,0 +1,83 @@
+/* Extra styling for app/app.py, matching the animated demo (app/demo/styles.css).
+   Colours come from Streamlit's theme variables where possible, so light and dark both work. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
+html, body, [class*="st-"], .stMarkdown, button, input, textarea, select {
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif !important;
+  font-feature-settings: "cv11", "ss01", "ss03";
+}
+/* keep Streamlit's icon fonts working */
+[data-testid="stIconMaterial"], .material-symbols-rounded, [class*="material-symbols"] { font-family: "Material Symbols Rounded" !important; }
+
+.block-container { padding-top: 1.6rem !important; padding-bottom: 3rem !important; max-width: 1480px; }
+header[data-testid="stHeader"] { background: transparent; }
+
+/* ---------- hero ---------- */
+.p30-hero { display: flex; align-items: center; gap: 16px; margin: 4px 0 18px; flex-wrap: wrap; }
+.p30-hero svg { width: 48px; height: 48px; flex: 0 0 auto; filter: drop-shadow(0 8px 18px rgba(59, 87, 214, .35)); }
+.p30-hero h1 { font-size: 30px !important; font-weight: 800 !important; letter-spacing: -0.03em; margin: 0 !important; padding: 0 !important; line-height: 1.15 !important; }
+.p30-hero p { margin: 4px 0 0 !important; opacity: .68; font-size: 14.5px; }
+.p30-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.p30-chip {
+  font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 999px;
+  border: 1px solid rgba(128, 128, 128, .22); background: rgba(128, 128, 128, .06);
+}
+.p30-chip b { font-weight: 800; }
+
+/* ---------- tabs as a pill bar ---------- */
+/* Streamlit 1.67 tabs: react-aria [role=tablist] > [data-testid=stTab]; older: baseweb */
+.stTabs [role="tablist"], .stTabs [data-baseweb="tab-list"] {
+  gap: 4px !important; padding: 5px !important; border-radius: 999px !important; width: fit-content; max-width: 100%;
+  overflow-x: auto; border: 1px solid rgba(128, 128, 128, .22) !important; background: rgba(128, 128, 128, .06) !important;
+  box-shadow: none !important;
+}
+.stTabs [role="tablist"]::after, .stTabs [role="tablist"]::before { display: none !important; }
+.stTabs [role="tab"] {
+  height: auto !important; padding: 8px 18px !important; margin: 0 !important; border-radius: 999px !important;
+  border: 0 !important; transition: background .25s, color .25s, box-shadow .25s; white-space: nowrap;
+}
+.stTabs [role="tab"]:hover { background: rgba(128, 128, 128, .10) !important; }
+.stTabs [role="tab"] p { font-weight: 600 !important; font-size: 14px !important; margin: 0 !important; }
+.stTabs [role="tab"][aria-selected="true"] {
+  background: linear-gradient(180deg, #5b74ea, #3b57d6) !important; color: #fff !important;
+  box-shadow: 0 6px 16px -4px rgba(59, 87, 214, .55) !important;
+}
+.stTabs [role="tab"][aria-selected="true"] p { color: #fff !important; }
+.stTabs .react-aria-SelectionIndicator, .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] { display: none !important; }
+.stTabs [role="tabpanel"], .stTabs .stTabPanel { padding-top: 22px; }
+
+/* ---------- headings ---------- */
+h2, h3, [data-testid="stHeading"] h3 { font-weight: 750 !important; letter-spacing: -0.02em; }
+[data-testid="stHeading"] h3 { font-size: 22px !important; padding-top: 8px !important; }
+
+/* ---------- cards: metrics, charts, dataframes ---------- */
+[data-testid="stMetric"] {
+  border: 1px solid rgba(128, 128, 128, .2); border-radius: 16px; padding: 16px 18px;
+  background: var(--secondary-background-color, rgba(128,128,128,.04));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 10px 26px -12px rgba(0, 0, 0, .18);
+}
+[data-testid="stMetricValue"] { font-weight: 800 !important; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+[data-testid="stMetricLabel"] p { font-weight: 600 !important; opacity: .7; }
+[data-testid="stPlotlyChart"] {
+  border: 1px solid rgba(128, 128, 128, .18); border-radius: 18px; padding: 10px 8px 4px;
+  background: var(--secondary-background-color, transparent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .03), 0 12px 30px -16px rgba(0, 0, 0, .2);
+}
+
+/* ---------- the answer callouts (st.info) ---------- */
+[data-testid="stAlertContainer"] {
+  border-radius: 16px !important; border: 1px solid rgba(59, 87, 214, .25) !important;
+  background: linear-gradient(135deg, rgba(59, 87, 214, .10), rgba(59, 87, 214, .03)) !important;
+  padding: 14px 16px !important;
+}
+[data-testid="stAlertContainer"] p { font-size: 15px; line-height: 1.6; }
+
+/* ---------- inputs ---------- */
+[data-testid="stRadio"] [role="radiogroup"] { gap: 6px; }
+[data-testid="stRadio"] [role="radiogroup"] label { padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(128, 128, 128, .2); }
+[data-testid="stExpander"] details { border-radius: 14px !important; }
+
+/* ---------- embedded demo ---------- */
+iframe[title="st.iframe"], [data-testid="stIFrame"], [data-testid="stCustomComponentV1"] { border-radius: 18px; }
+
+.p30-foot { margin-top: 36px; padding-top: 14px; border-top: 1px solid rgba(128, 128, 128, .2); font-size: 12.5px; opacity: .65; }

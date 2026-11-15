@@ -17,7 +17,7 @@ def _texts(at):
 def test_app_loads_without_errors():
     at = AppTest.from_file(APP, default_timeout=60).run()
     assert not at.exception
-    assert len(at.tabs) == 4
+    assert len(at.tabs) == 5  # "Guided demo" (embedded app/demo page) + the 4 results tabs
     assert "nan" not in _texts(at).lower()
 
 

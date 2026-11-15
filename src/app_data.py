@@ -25,6 +25,27 @@ STRATEGY_LABELS = {
 }
 
 
+def demo_html():
+    """The animated demo page (app/demo/) as ONE self-contained HTML string.
+
+    st.components.v1.html renders a page inside an iframe that cannot load the
+    page's sibling files, so the stylesheet, the data file and the script are
+    inlined. The body gets the 'embed' class, which hides the page footer.
+    Run `python -m src.demo_data` first so demo_data.js is current."""
+    d = config.DEMO_DIR
+    html = (d / "index.html").read_text(encoding="utf-8")
+    parts = {
+        '<link rel="stylesheet" href="styles.css">': "<style>" + (d / "styles.css").read_text(encoding="utf-8") + "</style>",
+        '<script src="demo_data.js"></script>': "<script>" + config.DEMO_DATA_JS.read_text(encoding="utf-8") + "</script>",
+        '<script src="demo.js"></script>': "<script>" + (d / "demo.js").read_text(encoding="utf-8") + "</script>",
+        "<body>": '<body class="embed">',
+    }
+    for tag, inline in parts.items():
+        assert html.count(tag) == 1, f"demo index.html changed: expected one {tag!r}"
+        html = html.replace(tag, inline)
+    return html
+
+
 def load_states_real():
     """Weekly MRSA prevalence per group (P3 main run), one row per week and group."""
     return pd.read_csv(TABLES / "p3_states_real.csv")

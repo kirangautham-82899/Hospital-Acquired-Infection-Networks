@@ -110,3 +110,12 @@ APP_MODEL = "D3"  # dictionary used for the app's what-if forecast (best h=1 RMS
 APP_OUTBREAK_BUMP = 0.30  # what-if: add this much prevalence to the chosen ward's usual level
 APP_HORIZON_WEEKS = 8  # what-if forecast length (K was trained on 16-week trajectories)
 APP_REAL_WARDS = ["Menard 1", "Menard 2", "Sorrel 0", "Sorrel 1", "Sorrel 2"]  # wards an outbreak can be started in
+
+# --- Animated demo page (app/demo/index.html, src/demo_data.py): read-only ---
+DEMO_DIR = ROOT_DIR / "app" / "demo"
+DEMO_DATA_JS = DEMO_DIR / "demo_data.js"  # generated; open index.html directly, no server needed
+DEMO_PEOPLE_PER_FIGURE = 4  # each animated figure stands for about this many people
+DEMO_FORECAST_MODELS = ["persistence", APP_MODEL, "ward_sis", "historical_mean"]  # shown on the forecast scene
+STORY_MRSA_STRAIN_PREFIX = "1."  # microbio strain codes: "1.x.x" = MRSA types, "2.x.x" = MSSA (src/story.py)
+STORY_WINDOW_PAD_DAYS = 14  # swabs shown this many days before the first contact / after C's positive swab
+DEMO_STRATEGIES =["none", "random", "whole_hospital", "degree_targeted", f"koopman_targeted_{APP_MODEL}"]

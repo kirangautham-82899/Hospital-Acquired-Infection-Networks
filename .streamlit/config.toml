@@ -1,5 +1,25 @@
+# Colours match the animated demo (app/demo/styles.css) so the embedded page
+# and the Streamlit app look like one product. No `base`: the app follows the
+# viewer's system light/dark setting, like the demo does.
 [theme]
-base = "light"
+baseRadius = "0.85rem"
+showWidgetBorder = true
+
+[theme.light]
+primaryColor = "#3b57d6"
+backgroundColor = "#f4f2ed"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#16191d"
+borderColor = "#e7e3da"
+linkColor = "#3b57d6"
+
+[theme.dark]
+primaryColor = "#8197ff"
+backgroundColor = "#0c0e12"
+secondaryBackgroundColor = "#15181d"
+textColor = "#eceae5"
+borderColor = "#262a31"
+linkColor = "#8197ff"
 
 [browser]
 gatherUsageStats = false

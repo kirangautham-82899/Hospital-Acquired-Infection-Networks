@@ -18,15 +18,21 @@ import numpy as np  # noqa: E402
 import plotly.express as px  # noqa: E402
 import plotly.graph_objects as go  # noqa: E402
 import streamlit as st  # noqa: E402
+import streamlit.components.v1 as components  # noqa: E402
 
 import config  # noqa: E402
 from src import app_data as ad  # noqa: E402
 
-HIGHLIGHT = "#D85A30"
-MUTED = "#B4B2A9"
-GROUP_COLORS = dict(zip(config.WARD_GROUPS, ["#534AB7", "#7F77DD", "#1D9E75", "#D85A30", "#D4537E", "#888780"]))
+# Palette shared with the animated demo (app/demo/styles.css)
+ACCENT = "#3b57d6"   # the Koopman model
+HIGHLIGHT = "#e4553a"  # MRSA / the ward in focus
+MUTED = "#a3a8b1"
+GROUP_COLORS = dict(zip(config.WARD_GROUPS, ["#3b57d6", "#8197ff", "#22995a", "#e4553a", "#d4537e", "#8a8f98"]))
+DEMO_HEIGHT = 860  # px; the demo's two-column layout fits in this at normal laptop widths
 
-st.set_page_config(page_title="MRSA in the hospital", page_icon="🏥", layout="wide")
+st.set_page_config(page_title="MRSA Ward Map", page_icon="🏥", layout="wide", initial_sidebar_state="collapsed")
+st.markdown(f"<style>{(Path(__file__).parent / 'streamlit_style.css').read_text(encoding='utf-8')}</style>",
+            unsafe_allow_html=True)
 
 
 @st.cache_data
@@ -58,19 +64,35 @@ states = cached_states()
 W = cached_w()
 model = cached_model()
 
-st.title("MRSA in the hospital")
-st.caption(
-    "How MRSA moves between wards of a 200-bed hospital (I-Bird study, Berck-sur-Mer, 2009), "
-    "and which ward to protect first."
+summary = ad.hospital_summary()
+st.markdown(
+    f"""<div class="p30-hero">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="12" fill="{ACCENT}"/>
+        <path d="M16 9h8v7h7v8h-7v7h-8v-7H9v-8h7z" fill="#fff" opacity=".95"/><circle cx="20" cy="20" r="3.2" fill="{HIGHLIGHT}"/></svg>
+      <div><h1>MRSA on the ward map</h1>
+        <p>How MRSA moves between the wards of a 200-bed hospital (I-Bird study, Berck-sur-Mer, 2009), and which ward to protect first.</p></div>
+      <div class="p30-chips"><span class="p30-chip"><b>{summary['people']}</b> people</span>
+        <span class="p30-chip"><b>{summary['groups']}</b> groups</span><span class="p30-chip"><b>{summary['weeks']}</b> weeks</span>
+        <span class="p30-chip">Koopman / EDMD</span></div>
+    </div>""",
+    unsafe_allow_html=True,
 )
 
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["1. The hospital", "2. What happened", "3. What will happen?", "4. Which ward to protect?"]
+tab0, tab1, tab2, tab3, tab4 = st.tabs(
+    ["▶  Guided demo", "The hospital", "What happened", "What will happen?", "Which ward to protect?"]
 )
+
+# ------------------------------------------------------------------ tab 0 --
+with tab0:
+    if config.DEMO_DATA_JS.exists():
+        components.html(ad.demo_html(), height=DEMO_HEIGHT, scrolling=True)
+        st.caption("Use ← → inside the demo to step, Space to play or pause, T to switch light / dark. "
+                   "Every number comes from the saved results; the walking figures are decoration.")
+    else:
+        st.warning("The demo data is missing. Run `python -m src.demo_data` from the project root, then reload.")
 
 # ------------------------------------------------------------------ tab 1 --
 with tab1:
-    summary = ad.hospital_summary()
     c = st.columns(4)
     c[0].metric("People with sensor contacts", summary["people"])
     c[1].metric("Patients", summary["patients"])
@@ -81,7 +103,8 @@ with tab1:
     left, right = st.columns([3, 2])
     with left:
         fig = px.imshow(
-            W.to_numpy(), x=list(W.columns), y=list(W.index), color_continuous_scale="Blues",
+            W.to_numpy(), x=list(W.columns), y=list(W.index),
+            color_continuous_scale=[[0, "rgba(59,87,214,0.04)"], [0.25, "rgba(59,87,214,0.35)"], [1, ACCENT]],
             text_auto=".0%", zmin=0, zmax=1, aspect="auto",
             labels=dict(x="Contact time spent with…", y="People in…", color="Share"),
         )
@@ -125,13 +148,13 @@ with tab2:
     one = fva[fva["ward"] == ward].sort_values("landing_week")
     fig = go.Figure()
     fig.add_scatter(x=one["landing_week"], y=one["actual"], name="What really happened", mode="lines+markers",
-                    line=dict(color="#2C2C2A", width=3))
+                    line=dict(color=HIGHLIGHT, width=3))
     fig.add_scatter(x=one["landing_week"], y=one["koopman"], name="Koopman forecast", mode="lines+markers",
-                    line=dict(color=HIGHLIGHT, dash="dash"))
+                    line=dict(color=ACCENT, width=2.5))
     fig.add_scatter(x=one["landing_week"], y=one["persistence"], name="'Same as this week' guess",
-                    mode="lines", line=dict(color=MUTED, dash="dot"))
+                    mode="lines", line=dict(color=MUTED, dash="dash"))
     fig.add_vrect(x0=min(config.HOLDOUT_WEEKS) - 0.5, x1=max(config.HOLDOUT_WEEKS) + 0.5,
-                  fillcolor="#E6F1FB", opacity=0.5, line_width=0, annotation_text="Test weeks", layer="below",
+                  fillcolor=ACCENT, opacity=0.08, line_width=0, annotation_text="Test weeks", layer="below",
                   annotation_position="top left")
     fig.update_xaxes(title="Week of study")
     st.plotly_chart(pct_axis(fig, "People with MRSA"), width="stretch")
@@ -183,7 +206,7 @@ with tab4:
                    format_func=lambda v: f"{v:.0%}")
     opts = ad.intervention_options(k, red)
     show = opts[opts["strategy"] != "none"].iloc[::-1]
-    colors = [HIGHLIGHT if s.startswith("koopman") else MUTED for s in show["strategy"]]
+    colors = [ACCENT if s.startswith("koopman") else MUTED for s in show["strategy"]]
     labels = [f"{l}  ({w})" if w else l for l, w in zip(show["label"], show["targeted_wards"])]
     fig = go.Figure(go.Bar(
         x=show["drop_mean"], y=labels, orientation="h", marker_color=colors,
@@ -223,3 +246,10 @@ with tab4:
         f"agrees well with this (rank correlation {agree['koopman']:.2f}), but simply counting each ward's contact "
         f"time agrees even better ({agree['contacts']:.2f}). With only 6 groups, neither ranking is statistically strong."
     )
+
+st.markdown(
+    '<div class="p30-foot">Read-only viewer of the saved P30 results: nothing is simulated or fitted here. '
+    "Data: I-Bird study (Obadia et al. 2015, PLOS Comput Biol; Duval et al. 2018, Sci Rep). "
+    "Local use only: the data licence is unverified.</div>",
+    unsafe_allow_html=True,
+)
