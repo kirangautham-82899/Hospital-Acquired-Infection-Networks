@@ -25,18 +25,22 @@ STRATEGY_LABELS = {
 }
 
 
-def demo_html():
-    """The animated demo page (app/demo/) as ONE self-contained HTML string.
+def demo_html(scene=0):
+    """The animated demo page (app/demo/) as ONE self-contained HTML string,
+    opened on scene number `scene` (0 = the story, then the order of the
+    demo's own scene bar) with its navigation locked to that scene.
 
     st.components.v1.html renders a page inside an iframe that cannot load the
     page's sibling files, so the stylesheet, the data file and the script are
-    inlined. The body gets the 'embed' class, which hides the page footer.
+    inlined. The body gets the 'embed' class, which hides the demo's own
+    header, scene bar and footer: the Streamlit sidebar is the navigation.
     Run `python -m src.demo_data` first so demo_data.js is current."""
     d = config.DEMO_DIR
     html = (d / "index.html").read_text(encoding="utf-8")
     parts = {
         '<link rel="stylesheet" href="styles.css">': "<style>" + (d / "styles.css").read_text(encoding="utf-8") + "</style>",
-        '<script src="demo_data.js"></script>': "<script>" + config.DEMO_DATA_JS.read_text(encoding="utf-8") + "</script>",
+        '<script src="demo_data.js"></script>': f"<script>window.DEMO_START = {int(scene)}; window.DEMO_LOCK = true;</script>"
+                                                "<script>" + config.DEMO_DATA_JS.read_text(encoding="utf-8") + "</script>",
         '<script src="demo.js"></script>': "<script>" + (d / "demo.js").read_text(encoding="utf-8") + "</script>",
         "<body>": '<body class="embed">',
     }

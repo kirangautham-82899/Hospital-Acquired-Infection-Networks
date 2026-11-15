@@ -88,4 +88,4 @@ def test_demo_html_is_self_contained():
     html = demo_html()
     assert 'href="styles.css"' not in html and 'src="demo.js"' not in html and 'src="demo_data.js"' not in html
     assert "window.DEMO_DATA = " in html and '<body class="embed">' in html
-    assert html.count("<script>") == 2
+    assert html.count("<script>") == 3  # start-scene settings, data, script

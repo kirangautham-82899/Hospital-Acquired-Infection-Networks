@@ -1,25 +1,34 @@
-# Colours match the animated demo (app/demo/styles.css) so the embedded page
-# and the Streamlit app look like one product. No `base`: the app follows the
-# viewer's system light/dark setting, like the demo does.
+# Next.js-style neutrals; data colours (blue = Koopman, red = MRSA) live in the
+# charts and the embedded scenes. No `base`: follows the viewer's light/dark setting.
 [theme]
-baseRadius = "0.85rem"
+baseRadius = "0.5rem"
 showWidgetBorder = true
 
 [theme.light]
-primaryColor = "#3b57d6"
-backgroundColor = "#f4f2ed"
+primaryColor = "#171717"
+backgroundColor = "#fafafa"
 secondaryBackgroundColor = "#ffffff"
-textColor = "#16191d"
-borderColor = "#e7e3da"
-linkColor = "#3b57d6"
+textColor = "#171717"
+borderColor = "#eaeaea"
+linkColor = "#171717"
 
 [theme.dark]
-primaryColor = "#8197ff"
-backgroundColor = "#0c0e12"
-secondaryBackgroundColor = "#15181d"
-textColor = "#eceae5"
-borderColor = "#262a31"
-linkColor = "#8197ff"
+primaryColor = "#ededed"
+backgroundColor = "#000000"
+secondaryBackgroundColor = "#0a0a0a"
+textColor = "#ededed"
+borderColor = "#1f1f1f"
+linkColor = "#ededed"
+
+[theme.light.sidebar]
+backgroundColor = "#ffffff"
+
+[theme.dark.sidebar]
+backgroundColor = "#0a0a0a"
+
+[client]
+toolbarMode = "minimal"      # no Deploy button or developer menu
+showSidebarNavigation = false
 
 [browser]
 gatherUsageStats = false

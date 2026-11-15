@@ -268,15 +268,30 @@ canvas { display: block; width: 100%; height: auto; cursor: default; }
 .foot { display: flex; gap: 16px; align-items: center; justify-content: space-between; max-width: 1520px; width: 100%; margin: 0 auto; padding: 2px 28px 22px; font-size: 12px; color: var(--muted); }
 .keys { white-space: nowrap; }
 
-/* ===== Embedded in Streamlit (src/app_data.py demo_html) ===== */
-body.embed { min-height: 0; background: transparent; }
-body.embed .foot { display: none; }
-body.embed .top { padding: 4px 2px 12px; max-width: none; }
-body.embed .brand { display: none; } /* the Streamlit page already shows the title */
-body.embed .steps { margin-left: 0; }
-body.embed .tools { margin-left: auto; }
-body.embed .progress { width: calc(100% - 4px); max-width: none; }
-body.embed .layout { padding: 0 2px 6px; max-width: none; }
+/* ===== Embedded in the Streamlit app (src/app_data.py demo_html) =====
+   The host app owns navigation and the page title, so the demo shows only its
+   stage and story panel, in the app's Next.js-style neutrals and Geist type. */
+body.embed { min-height: 0; background: transparent; font-family: Geist, Inter, system-ui, sans-serif; }
+body.embed .top, body.embed .progress, body.embed .foot, body.embed .panel-nav { display: none; }
+body.embed .layout { padding: 2px; max-width: none; gap: 16px; grid-template-columns: minmax(0, 1.75fr) minmax(320px, 1fr); }
+body.embed .card { border-radius: 12px; box-shadow: none; }
+body.embed .canvas-wrap { border-radius: 8px; }
+body.embed .panel { min-height: 0; padding: 22px; }
+body.embed .panel::before { display: none; }
+body.embed .panel .kicker { font-family: "Geist Mono", ui-monospace, monospace; font-weight: 500; letter-spacing: .04em; color: var(--muted); }
+body.embed .panel .kicker::before { display: none; }
+body.embed .panel h2 { font-weight: 600; letter-spacing: -0.035em; }
+body.embed .play { background: var(--ink); color: var(--surface); box-shadow: none; }
+body.embed .play.ghost-btn { background: var(--surface); color: var(--ink); }
+body.embed .chip.on { box-shadow: 0 0 0 1px var(--line-strong); }
+body.embed .strat.on { box-shadow: none; }
+body.embed .legend { border-top-color: var(--line); }
+body.embed { --surface: #ffffff; --surface-2: #fafafa; --ink: #171717; --muted: #6f6f6f; --line: #eaeaea; --line-strong: #d4d4d4;
+  --floor: #ffffff; --floor-tile: #f4f4f4; --corridor: #f5f5f5; --wall: #d9d9d9; }
+@media (prefers-color-scheme: dark) {
+  body.embed { --surface: #0a0a0a; --surface-2: #111111; --ink: #ededed; --muted: #a1a1a1; --line: #222222; --line-strong: #333333;
+    --floor: #111111; --floor-tile: #161616; --corridor: #0a0a0a; --wall: #2e2e2e; }
+}
 
 /* ===== Presentation mode ===== */
 body.present .foot, body.present .sub, body.present .progress { display: none; }

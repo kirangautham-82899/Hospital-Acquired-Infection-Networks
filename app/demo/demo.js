@@ -106,6 +106,8 @@
 
   // ---------- state ----------
   const STORY = 5; // internal id of the story scene (shown first)
+  // Set by the host page (src/app_data.py demo_html): open on one scene and leave navigation to the host.
+  const LOCK = !!window.DEMO_LOCK;
   const S = {
     scene: STORY, pos: 0, week: 5, playing: false, playAcc: 0, hover: null,
     fcWard: "Menard 2", fcWeek: 13,
@@ -150,7 +152,7 @@
     // corridor lane markings
     ctx.strokeStyle = rgb(T.wall, 0.5); ctx.setLineDash([10, 12]); ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(20, CORR_Y); ctx.lineTo(W - 20, CORR_Y); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = rgb(T.muted, 0.75); ctx.font = "600 11px Inter, system-ui, sans-serif"; ctx.textAlign = "left";
+    ctx.fillStyle = rgb(T.muted, 0.75); ctx.font = "600 11px Geist, Inter, system-ui, sans-serif"; ctx.textAlign = "left";
     ctx.fillText("CORRIDOR", 28, CORR_Y - 8);
 
     const targets = targetedWards();
@@ -230,16 +232,16 @@
   function drawRoomLabel(r) {
     const g = r.g, p = prevForMap(g);
     const lx = r.x + 18, ly = r.top ? r.y + 30 : r.y + 30;
-    ctx.textAlign = "left"; ctx.fillStyle = rgb(T.ink); ctx.font = "700 17px Inter, system-ui, sans-serif";
+    ctx.textAlign = "left"; ctx.fillStyle = rgb(T.ink); ctx.font = "700 17px Geist, Inter, system-ui, sans-serif";
     ctx.fillText(g, lx, ly);
     // "#1 spreader" badge in the superspreader scene (ground truth from simulation)
     if (S.scene === 3 && g === topSpreadWard) {
       const nw = ctx.measureText(g).width, bx = lx + nw + 10, label = "#1 SPREADER";
-      ctx.font = "750 10.5px Inter, system-ui, sans-serif"; const bw = ctx.measureText(label).width + 16;
+      ctx.font = "750 10.5px Geist, Inter, system-ui, sans-serif"; const bw = ctx.measureText(label).width + 16;
       roundRect(bx, ly - 14, bw, 19, 9.5); ctx.fillStyle = rgb(T.pos); ctx.fill();
       ctx.fillStyle = "#fff"; ctx.fillText(label, bx + 8, ly);
     }
-    ctx.fillStyle = rgb(T.muted); ctx.font = "500 12px Inter, system-ui, sans-serif";
+    ctx.fillStyle = rgb(T.muted); ctx.font = "500 12px Geist, Inter, system-ui, sans-serif";
     const pp = D.people[g];
     let sub = pp.patients ? `${pp.patients} patients · ${pp.staff} staff` : `${pp.staff} staff (no beds)`;
     const wkRow = S.scene <= 2 ? weekOf(S.scene === 2 ? S.fcWeek : S.week).groups[g] : null;
@@ -263,11 +265,11 @@
     ctx.textAlign = "right";
     const rx = r.x + r.w - 18;
     if (p == null) {
-      ctx.fillStyle = rgb(T.muted); ctx.font = "600 13px Inter, system-ui, sans-serif"; ctx.fillText("not tested", rx, ly);
+      ctx.fillStyle = rgb(T.muted); ctx.font = "600 13px Geist, Inter, system-ui, sans-serif"; ctx.fillText("not tested", rx, ly);
     } else {
-      ctx.fillStyle = rgb(mix(T.ink, T.pos, clamp(p * 2.2, 0, 1))); ctx.font = "750 24px Inter, system-ui, sans-serif";
+      ctx.fillStyle = rgb(mix(T.ink, T.pos, clamp(p * 2.2, 0, 1))); ctx.font = "750 24px Geist, Inter, system-ui, sans-serif";
       ctx.fillText(pct(p), rx - (S.scene === 4 && targetedWards().includes(g) && S.strategy !== "whole_hospital" ? 30 : 0), ly + 2);
-      if (isLow(g)) { ctx.fillStyle = rgb(T.muted); ctx.font = "600 10.5px Inter, system-ui, sans-serif"; ctx.fillText("few tests", rx, ly + 18); }
+      if (isLow(g)) { ctx.fillStyle = rgb(T.muted); ctx.font = "600 10.5px Geist, Inter, system-ui, sans-serif"; ctx.fillText("few tests", rx, ly + 18); }
     }
   }
 
@@ -338,7 +340,7 @@
       {
         const mx = 0.25 * ax + 0.5 * cx + 0.25 * bx, my = 0.25 * ay + 0.5 * cy + 0.25 * by;
         const label = fmt(l.hours) + " h";
-        ctx.font = "650 11.5px Inter, system-ui, sans-serif"; ctx.textAlign = "center";
+        ctx.font = "650 11.5px Geist, Inter, system-ui, sans-serif"; ctx.textAlign = "center";
         const tw = ctx.measureText(label).width + 14;
         roundRect(mx - tw / 2, my - 11, tw, 22, 11); ctx.fillStyle = rgb(T.surface, 0.95); ctx.fill();
         ctx.strokeStyle = rgb(T.accent, 0.5); ctx.lineWidth = 1; ctx.stroke();
@@ -497,7 +499,7 @@
   }
 
   function pill(x, y, text, bg, fg, font) {
-    ctx.font = font || "650 13px Inter, system-ui, sans-serif"; const w = ctx.measureText(text).width + 22;
+    ctx.font = font || "650 13px Geist, Inter, system-ui, sans-serif"; const w = ctx.measureText(text).width + 22;
     roundRect(x - w / 2, y - 13, w, 26, 13); ctx.fillStyle = bg; ctx.fill(); ctx.fillStyle = fg; ctx.textAlign = "center"; ctx.fillText(text, x, y + 4.5);
     return w;
   }
@@ -515,7 +517,7 @@
     roundRect(-4, -12, 8, 24, 4); ctx.fillStyle = positive ? "rgba(255,255,255,0.9)" : rgb(T["surface-2"]); ctx.fill();
     ctx.strokeStyle = positive ? "#fff" : rgb(T.muted); ctx.lineWidth = 1.2; ctx.stroke();
     ctx.fillStyle = positive ? rgb(T.pos) : rgb(T.muted); ctx.fillRect(-3, 2, 6, 8); ctx.restore();
-    ctx.fillStyle = positive ? "#fff" : rgb(T.ink); ctx.font = "750 14px Inter, system-ui, sans-serif"; ctx.textAlign = "left";
+    ctx.fillStyle = positive ? "#fff" : rgb(T.ink); ctx.font = "750 14px Geist, Inter, system-ui, sans-serif"; ctx.textAlign = "left";
     ctx.fillText(positive ? "MRSA +" : "No MRSA", -24, 5);
     ctx.restore();
   }
@@ -533,9 +535,9 @@
     for (let y = R.y + 32; y < R.y + R.h; y += 32) { ctx.beginPath(); ctx.moveTo(R.x, y); ctx.lineTo(R.x + R.w, y); ctx.stroke(); }
     ctx.restore();
     roundRect(R.x, R.y, R.w, R.h, 22); ctx.strokeStyle = rgb(T.wall); ctx.lineWidth = 2; ctx.stroke();
-    ctx.textAlign = "left"; ctx.fillStyle = rgb(T.ink); ctx.font = "750 20px Inter, system-ui, sans-serif"; ctx.fillText(ST.ward + " ward", R.x + 24, R.y + 38);
-    ctx.fillStyle = rgb(T.muted); ctx.font = "500 13px Inter, system-ui, sans-serif"; ctx.fillText("Three real people from the data (anonymised). Everyone else is faded.", R.x + 24, R.y + 58);
-    pill(R.x + R.w - 92, R.y + 34, fmtD(SS.day, true), rgb(T.ink), rgb(T.surface), "700 14px Inter, system-ui, sans-serif");
+    ctx.textAlign = "left"; ctx.fillStyle = rgb(T.ink); ctx.font = "750 20px Geist, Inter, system-ui, sans-serif"; ctx.fillText(ST.ward + " ward", R.x + 24, R.y + 38);
+    ctx.fillStyle = rgb(T.muted); ctx.font = "500 13px Geist, Inter, system-ui, sans-serif"; ctx.fillText("Three real people from the data (anonymised). Everyone else is faded.", R.x + 24, R.y + 58);
+    pill(R.x + R.w - 92, R.y + 34, fmtD(SS.day, true), rgb(T.ink), rgb(T.surface), "700 14px Geist, Inter, system-ui, sans-serif");
 
     // contact: ring around the pair + minute counter + possible-route particles
     if (step.contact) {
@@ -544,7 +546,7 @@
       ctx.save(); ctx.globalAlpha = k;
       ctx.beginPath(); ctx.ellipse(cx, cy, 160, 105, 0, 0, Math.PI * 2); ctx.fillStyle = rgb(T.accent, 0.08); ctx.fill();
       ctx.setLineDash([8, 7]); ctx.lineDashOffset = -time * 20; ctx.strokeStyle = rgb(T.accent, 0.8); ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]);
-      pill(cx, cy - 118, `${fmt(SS.count)} min of contact`, rgb(T.accent), "#fff", "700 14px Inter, system-ui, sans-serif");
+      pill(cx, cy - 118, `${fmt(SS.count)} min of contact`, rgb(T.accent), "#fff", "700 14px Geist, Inter, system-ui, sans-serif");
       ctx.restore();
       if (!reduceMotion && SS.since > 1) {
         const src = a, dst = b; // the carrier is the first of the pair: A in A-B, B in B-C
@@ -564,8 +566,8 @@
       ctx.save(); ctx.globalAlpha = p.alpha;
       const name = (p.who === "B" ? "Staff " : "Patient ") + p.who;
       const status = p.c > 0.5 ? `carries MRSA ${ST.strain}` : "no MRSA";
-      ctx.textAlign = "center"; ctx.fillStyle = rgb(T.ink); ctx.font = "750 17px Inter, system-ui, sans-serif"; ctx.fillText(name, p.x, p.y + 30);
-      ctx.fillStyle = p.c > 0.5 ? rgb(T.pos) : rgb(T.muted); ctx.font = "600 13px Inter, system-ui, sans-serif"; ctx.fillText(status, p.x, p.y + 48);
+      ctx.textAlign = "center"; ctx.fillStyle = rgb(T.ink); ctx.font = "750 17px Geist, Inter, system-ui, sans-serif"; ctx.fillText(name, p.x, p.y + 30);
+      ctx.fillStyle = p.c > 0.5 ? rgb(T.pos) : rgb(T.muted); ctx.font = "600 13px Geist, Inter, system-ui, sans-serif"; ctx.fillText(status, p.x, p.y + 48);
       ctx.restore();
       if (step.badge && p.who in step.badge) drawSwabBubble(p, step.badge[p.who] === 1, SS.since - 0.3);
     });
@@ -576,15 +578,15 @@
   function drawStoryTimeline() {
     const L = 120, Rr = 960, X = (d) => L + (Rr - L) * (d - t0) / (t1 - t0);
     const lanes = { A: 478, B: 522, C: 566 };
-    ctx.textAlign = "left"; ctx.fillStyle = rgb(T.muted); ctx.font = "650 11px Inter, system-ui, sans-serif";
+    ctx.textAlign = "left"; ctx.fillStyle = rgb(T.muted); ctx.font = "650 11px Geist, Inter, system-ui, sans-serif";
     ctx.fillText("SWABS AND CONTACTS OVER TIME", 24, 452);
     ["A", "B", "C"].forEach((w) => {
       const y = lanes[w];
-      ctx.fillStyle = rgb(T.ink); ctx.font = "650 13px Inter, system-ui, sans-serif"; ctx.fillText((w === "B" ? "Staff " : "Patient ") + w, 24, y + 4);
+      ctx.fillStyle = rgb(T.ink); ctx.font = "650 13px Geist, Inter, system-ui, sans-serif"; ctx.fillText((w === "B" ? "Staff " : "Patient ") + w, 24, y + 4);
       ctx.strokeStyle = rgb(T.line); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(Rr, y); ctx.stroke();
     });
     // month ticks
-    ctx.fillStyle = rgb(T.muted); ctx.font = "500 11px Inter, system-ui, sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = rgb(T.muted); ctx.font = "500 11px Geist, Inter, system-ui, sans-serif"; ctx.textAlign = "center";
     for (let d = Math.ceil(t0); d <= t1; d++) {
       const dt = new Date(d * DAY);
       if (dt.getUTCDate() === 1 || dt.getUTCDate() === 15) { ctx.fillText(fmtD(d), X(d), 604); ctx.strokeStyle = rgb(T.line); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(d), 466); ctx.lineTo(X(d), 580); ctx.stroke(); }
@@ -608,7 +610,7 @@
     ctx.strokeStyle = rgb(T.ink, 0.7); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(px, 462); ctx.lineTo(px, 584); ctx.stroke();
     ctx.fillStyle = rgb(T.ink); ctx.beginPath(); ctx.moveTo(px - 6, 458); ctx.lineTo(px + 6, 458); ctx.lineTo(px, 466); ctx.closePath(); ctx.fill();
     // key
-    ctx.textAlign = "left"; ctx.font = "500 11.5px Inter, system-ui, sans-serif"; let kx = 420; const ky = 452;
+    ctx.textAlign = "left"; ctx.font = "500 11.5px Geist, Inter, system-ui, sans-serif"; let kx = 420; const ky = 452;
     ctx.fillStyle = rgb(T.pos); ctx.beginPath(); ctx.arc(kx, ky - 4, 5, 0, 7); ctx.fill(); ctx.fillStyle = rgb(T.muted); ctx.fillText("swab: MRSA", kx + 10, ky); kx += 100;
     ctx.beginPath(); ctx.arc(kx, ky - 4, 5, 0, 7); ctx.strokeStyle = rgb(T.muted); ctx.lineWidth = 2; ctx.stroke(); ctx.fillText("swab: no MRSA", kx + 10, ky); kx += 115;
     roundRect(kx - 3, ky - 11, 6, 14, 3); ctx.fillStyle = rgb(T.accent); ctx.fill(); ctx.fillStyle = rgb(T.muted); ctx.fillText("contact day (taller = longer)", kx + 10, ky);
@@ -964,10 +966,11 @@
       e.preventDefault();
       if (e.key === " ") { SS.playing = !SS.playing; SS.acc = 0; renderBar(); return; }
       SS.playing = false;
-      if (e.key === "ArrowRight") SS.step < STEPS.length - 1 ? storyGo(SS.step + 1) : go(S.pos + 1);
+      if (e.key === "ArrowRight") { if (SS.step < STEPS.length - 1) storyGo(SS.step + 1); else if (!LOCK) go(S.pos + 1); }
       else if (SS.step > 0) storyGo(SS.step - 1);
       return;
     }
+    if (LOCK) return; // embedded: the host app owns scene navigation
     if (e.key === "ArrowRight") go(S.pos + 1);
     else if (e.key === "ArrowLeft") go(S.pos - 1);
     else if (e.key === " " && (S.scene === 0 || S.scene === 1)) { e.preventDefault(); S.playing = !S.playing; const pb = $("playBtn"); if (pb) pb.innerHTML = playIcon(); }
@@ -985,6 +988,7 @@
   document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement) document.body.classList.remove("present"); sliderX = null; setTimeout(placeSlider, 60); });
   document.addEventListener("keydown", (e) => {
     if (e.target.tagName === "INPUT" || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (LOCK) return;
     if (e.key === "f" || e.key === "F") togglePresent();
     if (e.key === "t" || e.key === "T") $("themeBtn").click();
   });
@@ -997,6 +1001,17 @@
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", readTokens);
 
   $("perFigure").textContent = `Each figure ≈ ${D.people_per_figure} people`;
-  readTokens(); resize(); go(0);
+  readTokens(); resize(); go(clamp(window.DEMO_START | 0, 0, SCENES.length - 1));
+
+  // Embedded: size the host's iframe to the content, so there is no empty
+  // band and no inner scrollbar at any window width (same-origin frame).
+  if (LOCK && window.frameElement) {
+    const fit = () => {
+      try { window.frameElement.style.height = Math.ceil(document.querySelector(".layout").getBoundingClientRect().height + 6) + "px"; }
+      catch (e) { /* cross-origin host: keep the host's fixed height */ }
+    };
+    new ResizeObserver(fit).observe(document.body);
+    fit();
+  }
   requestAnimationFrame(frame);
 })();
