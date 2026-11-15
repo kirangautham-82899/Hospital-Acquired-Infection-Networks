@@ -13,6 +13,8 @@
   const KOOP = "koopman_targeted_" + MODEL;
   const W = 1000, H = 640;
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // ?speed=N fast-forwards the animations (for checking a whole sequence quickly); 1 by default
+  const FAST = Math.min(20, Math.max(1, +new URLSearchParams(location.search).get("speed") || 1));
 
   // ---------- helpers ----------
   const $ = (id) => document.getElementById(id);
@@ -56,41 +58,34 @@
   const linkMax = Math.max(...D.contacts.links.map((l) => l.hours));
 
   // ---------- layouts (canvas is 1000 x 640 units) ----------
-  // Hospital: one card per ward, 3 x 2.
+  // Hospital: six rooms on a corridor. Each room shows 10 people; the coral
+  // share follows the real swab share (P3), and a one-at-a-time sequence plays
+  // each week (see the sequence engine below).
   const ROOM = {};
-  const cols = [24, 350, 676], RW = 300, RH = 290;
-  G.forEach((g, i) => { ROOM[g] = { g, x: cols[i % 3], y: i < 3 ? 22 : 328, w: RW, h: RH }; });
-  // One small figure per person swabbed that week (real counts, src/transitions.py).
-  // Classes: still / first / new carry MRSA, cleared = carried at the previous swab, negative = no MRSA.
-  const TR = D.transitions || {}; // older demo_data.js without transitions: cards show "nobody swabbed"
-  const trOf = (w, g) => (TR[String(w)] || {})[g] || null;
-  const ORDER = ["still", "first", "new", "cleared", "negative"];
-  const DOT = { cols: 12, dx: 21.5, dy: 27, x0: 30, y0: 112 };
-  const pool = {};
-  G.forEach((g) => {
-    const cap = Math.max(...D.weeks.map((_, w) => (trOf(w, g) || { tested: 0 }).tested));
-    pool[g] = [...Array(cap).keys()].map(() => ({ x: 0, y: 0, tx: 0, ty: 0, a: 0, col: null, kind: "negative", pre: "negative", at: 0, show: false }));
+  const cols = [24, 350, 676], RW = 300, RH = 240, CORR = 320;
+  G.forEach((g, i) => {
+    const top = i < 3, x = cols[i % 3], y = top ? 22 : 378;
+    ROOM[g] = { g, x, y, w: RW, h: RH, top, door: { x: x + RW / 2, y: top ? y + RH : y }, fa: 1 };
   });
-  let weekShown = -1;
-  function stageWeek(now) {
-    G.forEach((g) => {
-      const t = trOf(S.week, g), r = ROOM[g], list = [];
-      if (t) ORDER.forEach((k) => { for (let i = 0; i < t[k]; i++) list.push(k); });
-      const seen = { new: 0, cleared: 0 };
-      pool[g].forEach((d, i) => {
-        d.show = i < list.length;
-        if (!d.show) return;
-        const k = list[i];
-        d.tx = r.x + DOT.x0 + (i % DOT.cols) * DOT.dx; d.ty = r.y + DOT.y0 + Math.floor(i / DOT.cols) * DOT.dy;
-        if (d.a < 0.05) { d.x = d.tx; d.y = d.ty; }
-        d.kind = k;
-        // the week plays in order: clears first, then the new infections burst in
-        d.pre = k === "new" ? "negative" : k === "cleared" ? "still" : k;
-        d.at = now + (k === "cleared" ? 0.45 + 0.04 * seen.cleared++ : k === "new" ? 1.1 + 0.07 * seen.new++ : 0);
-      });
+  const PER_ROOM = 10;
+  const people = {};
+  G.forEach((g) => {
+    const r = ROOM[g], staffOnly = D.people[g].patients === 0;
+    people[g] = [...Array(PER_ROOM).keys()].map((k) => {
+      const col = k % 5, row = Math.floor(k / 5);
+      const hx = r.x + 42 + col * 54, hy = r.y + 132 + row * 78;
+      return {
+        g, k, role: staffOnly || k % 4 === 3 ? "staff" : "patient", scale: 1.7,
+        hx, hy, x: hx, y: hy, want: 0, c: 0, m: 0, u: 0, alpha: 1, burst: -1,
+        phase: rr(0, 6.28), blink: rr(1, 5), dir: rand() < 0.5 ? -1 : 1, turnT: rr(2, 8),
+        skin: "skin" + (1 + Math.floor(rand() * 4)), hairStyle: Math.floor(rand() * 3), moving: false,
+      };
     });
-    weekShown = S.week;
-  }
+  });
+  // real weekly counts per ward (src/transitions.py)
+  const TR = D.transitions || {};
+  const trOf = (w, g) => (TR[String(w)] || {})[g] || null;
+  const kOf = (w, g) => { const r = D.weeks[w] && D.weeks[w].groups[g]; return r ? Math.round(r.p * PER_ROOM) : null; };
 
   // Ward network: one circle per ward on a ring; used by Contacts, Superspreader, Intervention.
   const maxPeople = Math.max(...G.map((g) => D.people[g].patients + D.people[g].staff));
@@ -161,61 +156,205 @@
   // ======================================================================
   // Scene: The hospital, as "10 people per ward". Red = carries MRSA.
   // ======================================================================
-  function kindColor(k) { return k === "negative" ? T.person : k === "cleared" ? T.safe : T.pos; }
+  // ======================================================================
+  // Hospital scene: one event at a time.
+  //   1. a carrier walks along the corridor to another ward and meets someone,
+  //      who picks up MRSA (route = the busiest real contact link to that ward)
+  //   2. inside a ward, a carrier passes it to a roommate
+  //   3. somewhere a carrier clears it
+  //   4. summary with the week's real counts; rooms settle to the real share
+  // Who infected whom is not in the data: walker and target are illustrative;
+  // the weekly counts, the shares and the ward links are real.
+  // ======================================================================
+  const SEQ = { week: -1, events: [], i: -1, phase: "", t: 0, walker: null, target: null, path: null, seg: 0, caption: "" };
+  const SPEED = 165;
 
-  function drawPerson(d, col, alpha, sc) {
-    ctx.save(); ctx.globalAlpha = alpha; ctx.translate(d.x, d.y); ctx.scale(sc * 1.22, sc * 1.22);
-    ctx.fillStyle = rgb(col);
-    ctx.beginPath(); ctx.arc(0, -6.2, 3.6, 0, 7); ctx.fill();          // head
-    roundRect(-5, -1.6, 10, 9, 4); ctx.fill();                          // body
-    ctx.restore();
+  function setCarriers(g, k) {
+    if (k == null) return;
+    const ps = people[g], on = ps.filter((p) => p.want === 1);
+    if (on.length > k) on.slice(k).forEach((p) => { p.want = 0; });
+    else {
+      const off = ps.filter((p) => p.want === 0).sort((a, b) => (a.role === "patient" ? 0 : 1) - (b.role === "patient" ? 0 : 1) || a.k - b.k);
+      off.slice(0, k - on.length).forEach((p) => { p.want = 1; });
+    }
+  }
+  const carriers = (g) => people[g].filter((p) => p.want === 1);
+  const clean = (g) => people[g].filter((p) => p.want === 0);
+  const pickStaffFirst = (arr) => arr.find((p) => p.role === "staff") || arr[0];
+  const pickPatientFirst = (arr) => arr.find((p) => p.role === "patient") || arr[0];
+  const linkHours = (a, b) => (D.contacts.links.find((l) => (l.a === a && l.b === b) || (l.a === b && l.b === a)) || { hours: 0 }).hours;
+
+  function sourceFor(dst) {
+    // the ward with a carrier that shares the most contact-hours with dst
+    return D.contacts.links.filter((l) => l.a === dst || l.b === dst)
+      .map((l) => (l.a === dst ? l.b : l.a)).sort((a, b) => linkHours(b, dst) - linkHours(a, dst))
+      .find((g) => carriers(g).length > 0) || null;
   }
 
-  function drawHospital(time) {
-    if (weekShown !== S.week) stageWeek(time);
-    ctx.fillStyle = rgb(T.corridor); ctx.fillRect(0, 0, W, H);
-    G.forEach((g) => {
-      const r = ROOM[g], t = trOf(S.week, g), row = weekOf(S.week).groups[g], hov = S.hover === g;
-      ctx.save(); ctx.shadowColor = "rgba(40,30,70,0.10)"; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6;
-      roundRect(r.x, r.y, r.w, r.h, 18); ctx.fillStyle = rgb(T.floor); ctx.fill(); ctx.restore();
-      roundRect(r.x, r.y, r.w, r.h, 18); ctx.lineWidth = hov ? 2.5 : 1.5;
-      ctx.strokeStyle = hov ? rgb(T.accent) : rgb(T.wall); if (row && row.low_n) ctx.setLineDash([6, 6]); ctx.stroke(); ctx.setLineDash([]);
-      ctx.textAlign = "left"; ctx.fillStyle = rgb(T.ink); ctx.font = "650 19px Geist, Inter, system-ui, sans-serif";
-      ctx.fillText(g, r.x + 22, r.y + 38);
-      ctx.fillStyle = rgb(T.muted); ctx.font = "500 12.5px Geist, Inter, system-ui, sans-serif";
-      ctx.fillText(t ? `${t.tested} swabbed · ${pct(row.p)} carry MRSA` : "nobody swabbed this week", r.x + 22, r.y + 60);
-      if (t) {
-        // what changed since each person's previous swab
-        let px = r.x + r.w - 20;
-        const pillR = (txt, col) => {
-          ctx.font = "700 12.5px Geist, Inter, system-ui, sans-serif"; const w = ctx.measureText(txt).width + 18;
-          px -= w; roundRect(px, r.y + 22, w, 24, 12); ctx.fillStyle = rgb(col, 0.16); ctx.fill();
-          ctx.fillStyle = rgb(col); ctx.textAlign = "left"; ctx.fillText(txt, px + 9, r.y + 38.5); px -= 6;
-        };
-        if (t.cleared) pillR(`−${t.cleared} cleared`, T.safe);
-        if (t.new) pillR(`+${t.new} new`, T.pos);
+  function buildWeek(w) {
+    G.forEach((g) => setCarriers(g, kOf(Math.max(0, w - 1), g) ?? kOf(w, g)));
+    G.forEach((g) => people[g].forEach((p) => { p.x = p.hx; p.y = p.hy; p.m = 0; p.burst = -1; p.moving = false; }));
+    const byNew = G.filter((g) => trOf(w, g) && trOf(w, g).new > 0).sort((a, b) => trOf(w, b).new - trOf(w, a).new);
+    const byClr = G.filter((g) => trOf(w, g) && trOf(w, g).cleared > 0).sort((a, b) => trOf(w, b).cleared - trOf(w, a).cleared);
+    const ev = [];
+    const dst = byNew.find((g) => sourceFor(g) && clean(g).length);
+    if (dst) ev.push({ type: "cross", src: sourceFor(dst), dst });
+    const inside = byNew.find((g) => g !== dst && carriers(g).length && clean(g).length) || (dst && carriers(dst).length ? dst : null);
+    if (inside) ev.push({ type: "inside", src: inside, dst: inside });
+    if (byClr[0]) ev.push({ type: "clear", src: byClr[0] });
+    ev.push({ type: "summary" });
+    Object.assign(SEQ, { week: w, events: ev, i: -1 });
+    nextEvent();
+  }
+
+  function setPhase(phase, caption) {
+    SEQ.phase = phase; SEQ.t = 0;
+    if (caption != null) { SEQ.caption = caption; const el = $("seqCaption"); if (el) { el.innerHTML = caption; el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); } }
+    const st = $("seqStep"); if (st) st.textContent = `${Math.min(SEQ.i + 1, SEQ.events.length)} / ${SEQ.events.length}`;
+  }
+
+  function nextEvent() {
+    SEQ.i += 1; SEQ.walker = SEQ.target = null;
+    const e = SEQ.events[SEQ.i];
+    if (!e) { if (S.playing) { S.week = (S.week + 1) % D.weeks.length; syncWeekUI(); } return; }
+    if (e.type === "cross" || e.type === "inside") {
+      let w = pickStaffFirst(carriers(e.src));
+      // staff are the ones who move between wards: hand the carrier role to a staff member (same count)
+      if (e.type === "cross" && w && w.role !== "staff") {
+        const s2 = clean(e.src).find((p) => p.role === "staff");
+        if (s2) { w.want = 0; w.c = 0; s2.want = 1; s2.c = 1; w = s2; }
       }
-    });
-    G.forEach((g) => pool[g].forEach((d) => {
-      d.a = lerp(d.a, d.show ? 1 : 0, reduceMotion ? 1 : 0.15);
-      if (d.a < 0.02) return;
-      d.x = lerp(d.x, d.tx, 0.2); d.y = lerp(d.y, d.ty, 0.2);
-      const k = reduceMotion || time >= d.at ? d.kind : d.pre, want = kindColor(k);
-      d.col = d.col ? mix(d.col, want, reduceMotion ? 1 : 0.18) : want.slice();
-      let sc = 1;
-      if (d.kind === "new" && time >= d.at && !reduceMotion) {
-        const e = time - d.at;                      // burst: a ring expands as the person turns coral
-        if (e < 0.9) {
-          sc = 1 + 0.45 * Math.sin(Math.min(1, e / 0.35) * Math.PI);
-          ctx.beginPath(); ctx.arc(d.x, d.y - 2, 6 + e * 22, 0, 7); ctx.strokeStyle = rgb(T.pos, 0.6 * (1 - e / 0.9)); ctx.lineWidth = 2; ctx.stroke();
-        }
+      const t = pickPatientFirst(clean(e.dst).filter((p) => p !== w));
+      if (!w || !t) { nextEvent(); return; }
+      SEQ.walker = w; SEQ.target = t;
+      const side = t.hx < (ROOM[e.dst].x + RW / 2) ? 1 : -1, spot = { x: t.hx + side * 30, y: t.hy + 2 };
+      if (e.type === "cross") {
+        const A = ROOM[e.src], B = ROOM[e.dst], inA = A.top ? -18 : 18, inB = B.top ? -18 : 18, lane = CORR + (A.top ? -10 : 10);
+        SEQ.path = [{ x: w.hx, y: w.hy }, { x: A.door.x, y: A.door.y + inA }, { x: A.door.x, y: lane }, { x: B.door.x, y: lane }, { x: B.door.x, y: B.door.y + inB }, spot];
+        setPhase("focus", `<b>A carrier on ${e.src}</b> sets off.`);
+      } else {
+        SEQ.path = [{ x: w.hx, y: w.hy }, spot];
+        setPhase("focus", `<b>Inside ${e.src}:</b> most contact never leaves the ward.`);
       }
-      drawPerson(d, d.col, d.a, sc);
-      if (d.kind === "first" && d.a > 0.5) {         // first swab already positive: dashed halo
-        ctx.save(); ctx.setLineDash([2, 2]); ctx.beginPath(); ctx.arc(d.x, d.y - 1.5, 9.5, 0, 7);
-        ctx.strokeStyle = rgb(T.pos, 0.8); ctx.lineWidth = 1.2; ctx.stroke(); ctx.restore();
-      }
+      SEQ.seg = 0;
+    } else if (e.type === "clear") {
+      SEQ.target = carriers(e.src)[0] || null;
+      if (!SEQ.target) { nextEvent(); return; }
+      setPhase("focus", `<b>On ${e.src},</b> a carrier's next swab comes back negative…`);
+    } else {
+      const t = weekTotals(SEQ.week);
+      setPhase("summary", `<b>Week ${SEQ.week} in the data:</b> <span class="c-pos">+${t.new} caught MRSA</span> and <span class="c-safe">−${t.cleared} cleared</span> across the hospital.`);
+      G.forEach((g) => setCarriers(g, kOf(SEQ.week, g)));
+    }
+  }
+
+  function walk(p, path, dt) {
+    const tgt = path[SEQ.seg + 1];
+    if (!tgt) return true;
+    const dx = tgt.x - p.x, dy = tgt.y - p.y, d = Math.hypot(dx, dy), m = SPEED * dt;
+    p.moving = true; p.dir = dx >= 0 ? 1 : -1; p.phase += dt * 11;
+    if (d <= m) { p.x = tgt.x; p.y = tgt.y; SEQ.seg += 1; return SEQ.seg >= path.length - 1; }
+    p.x += dx / d * m; p.y += dy / d * m; return false;
+  }
+
+  function updateSequence(dt, time) {
+    if (SEQ.week !== S.week) buildWeek(S.week);
+    const e = SEQ.events[SEQ.i];
+    // people settle toward their wanted colour; a burst runs on new infections
+    G.forEach((g) => people[g].forEach((p) => {
+      p.c = lerp(p.c, p.want, reduceMotion ? 1 : clamp(dt * 3, 0, 1));
+      if (!p.moving) p.phase += dt * 2;
+      p.blink -= dt; if (p.blink < 0) p.blink = rr(2.5, 6);
     }));
+    // spotlight: rooms in the current event stay bright
+    G.forEach((g) => {
+      const on = !e || e.type === "summary" || g === e.src || g === e.dst;
+      ROOM[g].fa = lerp(ROOM[g].fa, on ? 1 : 0.32, clamp(dt * 4, 0, 1));
+      people[g].forEach((p) => { p.alpha = p === SEQ.walker ? 1 : ROOM[g].fa; });
+    });
+    if (!S.playing || !e) return;
+    SEQ.t += dt;
+    const w = SEQ.walker, t = SEQ.target;
+    switch (SEQ.phase) {
+      case "focus":
+        if (SEQ.t > 1.4) {
+          if (e.type === "clear") { setPhase("clear", `<b>On ${e.src},</b> a carrier's next swab comes back negative: <span class="c-safe">cleared</span>.`); t.want = 0; }
+          else setPhase("walk", e.type === "cross"
+            ? `It walks to <b>${e.dst}</b>. These two wards share <b>${fmt(linkHours(e.src, e.dst))} contact-hours</b> over the study.`
+            : `A carrier walks over to a ${t.role} in the same room.`);
+        }
+        break;
+      case "walk":
+        if (walk(w, SEQ.path, dt)) { w.moving = false; w.dir = t.hx > w.x ? 1 : -1; setPhase("contact", `Close contact with a <b>${t.role}</b> on ${e.dst}…`); }
+        break;
+      case "contact":
+        if (SEQ.t > 1.8) { t.want = 1; t.burst = time; setPhase("infect", `…who <span class="c-pos">now carries MRSA</span> too.`); }
+        break;
+      case "infect":
+        if (SEQ.t > 1.6) { SEQ.path = SEQ.path.slice().reverse(); SEQ.path[SEQ.path.length - 1] = { x: w.hx, y: w.hy }; SEQ.seg = 0; setPhase("return", null); }
+        break;
+      case "return":
+        if (walk(w, SEQ.path, dt * 1.3)) { w.moving = false; w.x = w.hx; w.y = w.hy; nextEvent(); }
+        break;
+      case "clear":
+        t.m = lerp(t.m, SEQ.t < 1.4 ? 1 : 0, clamp(dt * 3, 0, 1));
+        if (SEQ.t > 2.4) { t.m = 0; nextEvent(); }
+        break;
+      case "summary":
+        if (SEQ.t > 3.2) nextEvent();
+        break;
+    }
+  }
+
+  function tag(x, y, text, col) {
+    ctx.font = "700 12px Geist, Inter, system-ui, sans-serif"; const w = ctx.measureText(text).width + 16;
+    roundRect(x - w / 2, y - 11, w, 22, 11); ctx.fillStyle = rgb(col); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x - 5, y + 10); ctx.lineTo(x + 5, y + 10); ctx.lineTo(x, y + 16); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.fillText(text, x, y + 4);
+  }
+
+  function drawHospital(time, dt) {
+    updateSequence(dt, time);
+    const e = SEQ.events[SEQ.i];
+    ctx.fillStyle = rgb(T.corridor); ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = rgb(T.wall, 0.6); ctx.setLineDash([10, 12]); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(20, CORR); ctx.lineTo(W - 20, CORR); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = rgb(T.muted, 0.8); ctx.font = "600 11px Geist, Inter, system-ui, sans-serif"; ctx.textAlign = "left"; ctx.fillText("CORRIDOR", 28, CORR - 10);
+    G.forEach((g) => {
+      const r = ROOM[g], row = weekOf(S.week).groups[g], focus = e && (g === e.src || g === e.dst) && e.type !== "summary";
+      ctx.save(); ctx.globalAlpha = r.fa;
+      ctx.save(); ctx.shadowColor = "rgba(40,30,70,0.12)"; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6;
+      roundRect(r.x, r.y, r.w, r.h, 18); ctx.fillStyle = rgb(T.floor); ctx.fill(); ctx.restore();
+      roundRect(r.x, r.y, r.w, r.h, 18); ctx.lineWidth = focus ? 2.5 : 1.5; ctx.strokeStyle = focus ? rgb(T.accent) : rgb(T.wall); ctx.stroke();
+      ctx.fillStyle = rgb(T.corridor); ctx.fillRect(r.door.x - 24, r.door.y - 3, 48, 6); // doorway
+      ctx.textAlign = "left"; ctx.fillStyle = rgb(T.ink); ctx.font = "650 18px Geist, Inter, system-ui, sans-serif"; ctx.fillText(g, r.x + 20, r.y + 34);
+      ctx.fillStyle = rgb(T.muted); ctx.font = "500 12px Geist, Inter, system-ui, sans-serif";
+      ctx.fillText(row ? `${row.tested} swabbed this week · ${pct(row.p)} carry MRSA` : "nobody swabbed this week", r.x + 20, r.y + 54);
+      ctx.restore();
+    });
+    // contact ring
+    if (SEQ.walker && SEQ.target && (SEQ.phase === "contact" || SEQ.phase === "infect")) {
+      const a = SEQ.walker, b = SEQ.target, cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2 - 24;
+      ctx.beginPath(); ctx.ellipse(cx, cy, 56, 44, 0, 0, 7); ctx.fillStyle = rgb(T.accent, 0.08); ctx.fill();
+      ctx.setLineDash([6, 6]); ctx.lineDashOffset = -time * 20; ctx.strokeStyle = rgb(T.accent, 0.85); ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]);
+    }
+    const all = G.flatMap((g) => people[g]).sort((a, b) => (a === SEQ.walker) - (b === SEQ.walker) || a.y - b.y);
+    all.forEach((p) => {
+      if (p.burst > 0 && time - p.burst < 1 && !reduceMotion) {
+        const k = time - p.burst; ctx.beginPath(); ctx.arc(p.x, p.y - 22, 14 + k * 46, 0, 7); ctx.strokeStyle = rgb(T.pos, 0.7 * (1 - k)); ctx.lineWidth = 2.5; ctx.stroke();
+      }
+      drawFigure(p, time);
+    });
+    if (SEQ.walker && SEQ.phase !== "") tag(SEQ.walker.x, SEQ.walker.y - 62, "carrier", T.pos);
+    if (SEQ.target && SEQ.phase === "infect") tag(SEQ.target.x, SEQ.target.y - 62, "new carrier", T.pos);
+    if (SEQ.target && SEQ.phase === "clear") tag(SEQ.target.x, SEQ.target.y - 62, "cleared", T.safe);
+    if (SEQ.phase === "summary") {
+      ctx.save(); ctx.globalAlpha = Math.min(1, SEQ.t * 3);
+      roundRect(330, CORR - 26, 340, 52, 26); ctx.fillStyle = rgb(T.surface); ctx.fill(); ctx.strokeStyle = rgb(T.line); ctx.lineWidth = 1; ctx.stroke();
+      const t = weekTotals(SEQ.week); ctx.textAlign = "center"; ctx.font = "700 17px Geist, Inter, system-ui, sans-serif";
+      ctx.fillStyle = rgb(T.pos); ctx.fillText(`+${t.new} caught`, 440, CORR + 6); ctx.fillStyle = rgb(T.safe); ctx.fillText(`−${t.cleared} cleared`, 565, CORR + 6);
+      ctx.restore();
+    }
   }
 
   // ======================================================================
@@ -409,6 +548,7 @@
       if (f.c > 0.5) drawGerm(8.5, -30 + (reduceMotion ? 0 : Math.sin(time * 2.2 + f.rank) * 1.2), 2.6, time);
     }
     let body = mix(T.person, T.pos, f.c);
+    if (f.m) body = mix(body, T.safe, f.m); // mint while a carrier clears
     // legs
     const step = moving ? Math.sin(f.phase) * 2 : 0;
     ctx.strokeStyle = rgb(mix(body, [40, 40, 50], 0.35)); ctx.lineWidth = 2.2; ctx.lineCap = "round";
@@ -646,7 +786,7 @@
 
   let last = performance.now(), clock = 0;
   function frame(now) {
-    const dt = Math.min(0.05, (now - last) / 1000); last = now; clock += dt;
+    const dt = Math.min(0.05, (now - last) / 1000) * FAST; last = now; clock += dt;
     if (S.scene === STORY) {
       updateStory(dt);
       ctx.setTransform(scale, 0, 0, scale, 0, 0);
@@ -655,12 +795,8 @@
       requestAnimationFrame(frame);
       return;
     }
-    if (S.playing && S.scene === 0) {
-      S.playAcc += dt;
-      if (S.playAcc > 3.6) { S.playAcc = 0; S.week = (S.week + 1) % D.weeks.length; syncWeekUI(); }
-    }
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
-    if (S.scene === 0) drawHospital(clock);
+    if (S.scene === 0) drawHospital(clock, dt);
     else if (S.scene === 2) drawForecast();
     else drawNetwork(clock);
     drawFade(dt);
@@ -714,8 +850,8 @@
 
   // ---------- legends under the stage ----------
   const LEGEND = {
-    people: `<span><i class="dot pos"></i><b>Coral = carries MRSA</b></span><span><i class="dot burst"></i>Burst = caught it since last swab</span>
-      <span><i class="dot clr"></i>Mint = cleared it</span><span><i class="dot neg"></i>Grey = no MRSA</span><span><i class="dot first"></i>Dashed = first swab positive</span>`,
+    people: `<span><i class="dot pos"></i><b>Coral = carries MRSA</b></span><span><i class="dot neg"></i>Grey = no MRSA</span>
+      <span><i class="dot clr"></i>Mint = just cleared</span><span class="legend-note">Each room = 10 people; coral share = real share that week</span>`,
     1: `<span><i class="lg-node"></i>Circle = a ward (bigger = more people)</span><span><i class="lg-ring"></i>Ring = contact time kept inside</span>
       <span><i class="lg-line"></i>Line = contact between wards (thicker = more)</span>`,
     3: `<span><i class="lg-node"></i>Number = MRSA-days saved by halving that ward's contacts</span><span><i class="lg-line" style="background:var(--pos)"></i>Red lines = the #1 ward's contacts</span>`,
@@ -726,7 +862,7 @@
   // ---------- scenes ----------
   const SCENES = [
     { id: STORY, name: "How it spreads", render: sceneStory, bar: storyBar },
-    { id: 0, name: "Hospital", render: sceneHospital, bar: weekBar },
+    { id: 0, name: "Hospital", render: sceneHospital, bar: spreadBar },
     { id: 1, name: "Contacts", render: sceneContacts, bar: () => `<span class="bar-hint">Hover a ward to see only its links.</span>` },
     { id: 2, name: "Forecast", render: sceneForecast, bar: forecastBar },
     { id: 3, name: "Superspreader", render: sceneSuper, bar: () => `<span class="bar-hint">The number in each circle: MRSA-days saved if that ward's contacts are halved.</span>` },
@@ -816,6 +952,12 @@
       <div class="week-info"><b id="wkLabel"></b><span id="wkDate"></span></div>
       <div class="slider-wrap"><input type="range" id="wkSlider" min="0" max="${n - 1}" value="${S.week}" aria-label="Week">
         <div class="phase-row"><span style="flex:${cal}">calibration weeks 0–${cal - 1}</span><span class="hold" style="flex:${n - cal}">held out ${cal}–${n - 1}</span></div></div>`;
+  }
+  function spreadBar() {
+    return `<button class="play" id="playBtn" aria-label="Play or pause">${playIcon()}</button>
+      <div class="week-info"><b id="wkLabel"></b><span id="wkDate"></span></div>
+      <div class="seq-cap"><span class="seq-step" id="seqStep"></span><span id="seqCaption">${SEQ.caption || ""}</span></div>
+      <input type="range" class="seq-slider" id="wkSlider" min="0" max="${D.weeks.length - 1}" value="${S.week}" aria-label="Week">`;
   }
   function forecastBar() {
     const wks = [...new Set(D.forecast.points.map((p) => p.landing_week))].sort((a, b) => a - b);
@@ -915,13 +1057,13 @@
   function sceneHospital() {
     const t = weekTotals(S.week);
     return `<p class="kicker">The whole hospital, week by week</p>
-      <h2>MRSA never sits still: people catch it and clear it every week.</h2>
-      <p>Each figure is <strong>one person swabbed</strong> that week. Watch each week play out: some <strong style="color:var(--safe)">clear it</strong>, then new carriers <strong style="color:var(--pos)">burst in</strong>.</p>
+      <h2>One week, one event at a time.</h2>
+      <p>A carrier <strong>walks to another ward</strong> and passes MRSA on. Then it spreads <strong>inside a ward</strong>. Then someone <strong style="color:var(--safe)">clears it</strong>. Each room's coral share is the real share that week.</p>
       <div class="flow"><div><b id="newNow" style="color:var(--pos)">+${t.new}</b><span>caught MRSA since<br>their last swab</span></div>
         <div><b id="clrNow" style="color:var(--safe)">−${t.cleared}</b><span>cleared it since<br>their last swab</span></div>
         <div><b id="stillNow">${t.still + t.first}</b><span>still or already<br>carrying</span></div></div>
       ${sparkline()}
-      <p class="fine">Over all ${D.weeks.length} weeks: <b>${allNew}</b> people caught MRSA and <b>${allClr}</b> cleared it, so the level stayed roughly steady. That balance is what our SIS model reproduces. A "new" carrier may also be a positive the previous swab missed.</p>`;
+      <p class="fine">Over all ${D.weeks.length} weeks: <b>${allNew}</b> people caught MRSA and <b>${allClr}</b> cleared it, so the level stayed steady, as our SIS model assumes. The data does not record who infected whom: the walker and the person they meet are an illustration; routes follow the real contact links.</p>`;
   }
 
   function sceneContacts() {

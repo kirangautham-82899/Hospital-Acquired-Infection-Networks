@@ -316,6 +316,14 @@ body.embed .sdot.on, body.embed .sdot.done { background: var(--accent); }
 body.embed .hbar.top .hb-fill { background: linear-gradient(90deg, var(--pos), #f7b2a6); }
 body.embed .strat.on .fill, body.embed .mini-bar { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
 
+/* hospital sequence caption under the stage */
+.seq-cap { flex: 1; min-width: 220px; display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--ink-2, var(--ink)); line-height: 1.4; }
+.seq-cap b { color: var(--ink); font-weight: 650; }
+.seq-step { flex: 0 0 auto; font: 600 11.5px "Geist Mono", ui-monospace, monospace; color: var(--accent); background: var(--accent-soft); padding: 3px 8px; border-radius: 999px; }
+#seqCaption.pop { animation: rise .45s var(--ease, ease) both; }
+.c-pos { color: var(--pos); font-weight: 650; } .c-safe { color: var(--safe); font-weight: 650; }
+.seq-slider { width: 130px; accent-color: var(--accent); }
+
 /* spreading-scene legend dots and the weekly flow counters */
 .dot.burst { background: var(--pos); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--pos-soft), 0 0 0 5px var(--pos); }
 .dot.clr { background: var(--safe); }
