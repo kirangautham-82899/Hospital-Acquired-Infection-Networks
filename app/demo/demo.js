@@ -1,6 +1,8 @@
 /* MRSA ward map: animated, read-only view of the saved P30 results.
    All numbers come from window.DEMO_DATA (written by src/demo_data.py).
-   The walking figures are decoration; their colours follow the real data. */
+   Scenes: the story (three real people), the hospital as "10 people per
+   ward", one ward network for contacts / superspreader / intervention, and
+   a "how close was each guess" chart for the forecast. Motion is decoration. */
 (() => {
   "use strict";
   const D = window.DEMO_DATA;
@@ -33,7 +35,7 @@
 
   let T = {};
   function readTokens() {
-    const cs = getComputedStyle(document.documentElement);
+    const cs = getComputedStyle(document.body);
     const names = ["bg", "surface", "surface-2", "ink", "muted", "line", "floor", "floor-tile", "corridor", "wall", "accent", "pos", "patient", "staff", "unk", "safe", "person", "cap", "skin1", "skin2", "skin3", "skin4", "hair"];
     names.forEach((n) => { T[n] = hexToRgb(cs.getPropertyValue("--" + n) || "#888"); });
   }
@@ -53,56 +55,40 @@
   const holdStart = Math.max(...D.calibration_weeks) + 1;
   const linkMax = Math.max(...D.contacts.links.map((l) => l.hours));
 
-  // ---------- floor layout (1000 x 640 units) ----------
-  const CORR_Y = 320;
+  // ---------- layouts (canvas is 1000 x 640 units) ----------
+  // Hospital: one card per ward, 3 x 2; each card shows 10 people tested there.
   const ROOM = {};
-  const cols = [24, 350, 676], RW = 300, RH = 252;
-  G.forEach((g, i) => {
-    const top = i < 3, x = cols[i % 3], y = top ? 22 : 366;
-    const door = { x: x + RW / 2, y: top ? y + RH : y };
-    const area = { x0: x + 22, x1: x + RW - 22, y0: y + 92, y1: y + RH - 14 };
-    ROOM[g] = { g, x, y, w: RW, h: RH, top, door, area, staffRoom: D.people[g].patients === 0 };
-  });
-
-  // ---------- figures ----------
-  const figures = [];
+  const cols = [24, 350, 676], RW = 300, RH = 290;
+  G.forEach((g, i) => { ROOM[g] = { g, x: cols[i % 3], y: i < 3 ? 22 : 328, w: RW, h: RH }; });
+  const PER_CARD = 10;
+  const icons = [];
   G.forEach((g) => {
-    const pp = D.people[g], n = Math.round((pp.patients + pp.staff) / D.people_per_figure);
-    const nPat = Math.round(n * pp.patients / (pp.patients + pp.staff));
-    const roles = [...Array(n).keys()].map((k) => (k < nPat ? "patient" : "staff")).sort(() => rand() - 0.5);
-    // Tidy rows: slot = rank, and the first k ranks are the MRSA carriers,
-    // so red figures always fill the front of the room (easy to count).
-    const a = ROOM[g].area, cols = 9, dx = (a.x1 - a.x0) / (cols - 1);
-    const rows = Math.ceil(n / cols), dy = Math.min(52, (a.y1 - a.y0 - 34) / Math.max(1, rows - 1));
-    for (let k = 0; k < n; k++) {
-      const col = k % cols, row = Math.floor(k / cols);
-      const sx = a.x0 + col * dx, sy = a.y0 + 34 + row * dy;
-      figures.push({
-        g, role: roles[k], rank: k, n, sx, sy, x: sx, y: sy, moving: false,
-        phase: rr(0, 6.28), skin: "skin" + (1 + Math.floor(rand() * 4)), blink: rr(1, 5), dir: rand() < 0.5 ? -1 : 1,
-        c: 0, u: 0, hairStyle: Math.floor(rand() * 3), turnT: rr(2, 8),
+    const r = ROOM[g];
+    for (let k = 0; k < PER_CARD; k++) {
+      const col = k % 5, row = Math.floor(k / 5);
+      icons.push({
+        g, rank: k, role: k % 3 === 2 ? "staff" : "patient", scale: 2.15,
+        x: r.x + 46 + col * 52, y: r.y + 150 + row * 92, c: 0, u: 0, alpha: 1,
+        phase: rr(0, 6.28), blink: rr(1, 5), dir: rand() < 0.5 ? -1 : 1, turnT: rr(2, 8),
+        skin: "skin" + (1 + Math.floor(rand() * 4)), hairStyle: Math.floor(rand() * 3), moving: false,
       });
     }
   });
-  const nFigByWard = {}; G.forEach((g) => { nFigByWard[g] = figures.filter((f) => f.g === g).length; });
 
-  const visitors = [];
-  function pathBetween(a, b) {
-    const A = ROOM[a], B = ROOM[b];
-    const pA = { x: rr(A.area.x0 + 30, A.area.x1 - 30), y: A.top ? A.area.y1 - 10 : A.area.y0 + 10 };
-    const pB = { x: rr(B.area.x0 + 30, B.area.x1 - 30), y: B.top ? B.area.y1 - 10 : B.area.y0 + 10 };
-    const lane = CORR_Y + rr(-16, 16);
-    return [pA, { x: A.door.x, y: A.door.y + (A.top ? -6 : 6) }, { x: A.door.x, y: lane }, { x: B.door.x, y: lane }, { x: B.door.x, y: B.door.y + (B.top ? -6 : 6) }, pB];
-  }
-  function spawnVisitor(a, b) {
-    const p = prevForMap(a);
-    visitors.push({
-      g: a, role: "staff", path: pathBetween(a, b), seg: 0, s: 0, fwd: true, stay: 0, done: false,
-      x: 0, y: 0, phase: rr(0, 6), skin: "skin" + (1 + Math.floor(rand() * 4)), blink: rr(1, 5), dir: 1,
-      c: p != null && rand() < p ? 1 : 0, u: 0, rank: 0, moving: true, hairStyle: 0, visitor: true, trail: [], trailT: 0,
-    });
-    const v = visitors[visitors.length - 1]; v.x = v.path[0].x; v.y = v.path[0].y;
-  }
+  // Ward network: one circle per ward on a ring; used by Contacts, Superspreader, Intervention.
+  const maxPeople = Math.max(...G.map((g) => D.people[g].patients + D.people[g].staff));
+  const NODE = {};
+  G.forEach((g, i) => {
+    const a = -Math.PI / 2 + i * 2 * Math.PI / G.length;
+    const n = D.people[g].patients + D.people[g].staff;
+    NODE[g] = { g, x: 500 + 300 * Math.cos(a), y: 326 + 212 * Math.sin(a), r: 34 + 20 * Math.sqrt(n / maxPeople), glow: 0 };
+  });
+  const linkPoint = (l, t) => {
+    const A = NODE[l.a], B = NODE[l.b];
+    const cx = (A.x + B.x) / 2 * 0.72 + 500 * 0.28, cy = (A.y + B.y) / 2 * 0.72 + 326 * 0.28; // bow toward the centre
+    return [(1 - t) * (1 - t) * A.x + 2 * (1 - t) * t * cx + t * t * B.x, (1 - t) * (1 - t) * A.y + 2 * (1 - t) * t * cy + t * t * B.y, cx, cy];
+  };
+  const dropMax = Math.max(...D.superspreader.wards.map((w) => w.drop));
 
   // ---------- state ----------
   const STORY = 5; // internal id of the story scene (shown first)
@@ -114,11 +100,6 @@
     k: 1, R: 0.5, strategy: KOOP,
   };
 
-  function prevForMap(g) {
-    if (S.scene === 2) return prevAt(S.fcWeek, g);
-    if (S.scene === 3 || S.scene === 4) return meanPrev[g];
-    return prevAt(S.week, g);
-  }
   function targetedWards() {
     if (S.scene !== 4) return [];
     const r = interRow(S.strategy);
@@ -147,74 +128,6 @@
     ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
   }
 
-  function drawFloor(time) {
-    ctx.fillStyle = rgb(T.corridor); ctx.fillRect(0, 0, W, H);
-    // corridor lane markings
-    ctx.strokeStyle = rgb(T.wall, 0.5); ctx.setLineDash([10, 12]); ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(20, CORR_Y); ctx.lineTo(W - 20, CORR_Y); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = rgb(T.muted, 0.75); ctx.font = "600 11px Geist, Inter, system-ui, sans-serif"; ctx.textAlign = "left";
-    ctx.fillText("CORRIDOR", 28, CORR_Y - 8);
-
-    const targets = targetedWards();
-    G.forEach((g) => {
-      const r = ROOM[g];
-      ctx.save(); ctx.globalAlpha = r.fa == null ? 1 : r.fa; // spotlight: rooms the scene is not about fade back
-      // soft drop shadow gives the rooms depth
-      ctx.save(); ctx.shadowColor = "rgba(0,0,0,0.16)"; ctx.shadowBlur = 22; ctx.shadowOffsetY = 8;
-      roundRect(r.x, r.y, r.w, r.h, 18); ctx.fillStyle = rgb(T.floor); ctx.fill(); ctx.restore();
-      ctx.save();
-      roundRect(r.x, r.y, r.w, r.h, 18); ctx.fillStyle = rgb(T.floor); ctx.fill();
-      ctx.clip();
-      // tiles
-      ctx.strokeStyle = rgb(T["floor-tile"]); ctx.lineWidth = 1;
-      for (let x = r.x + 25; x < r.x + r.w; x += 25) { ctx.beginPath(); ctx.moveTo(x, r.y); ctx.lineTo(x, r.y + r.h); ctx.stroke(); }
-      for (let y = r.y + 25; y < r.y + r.h; y += 25) { ctx.beginPath(); ctx.moveTo(r.x, y); ctx.lineTo(r.x + r.w, y); ctx.stroke(); }
-      ctx.restore();
-
-      // walls
-      const low = isLow(g), missing = prevForMap(g) == null;
-      roundRect(r.x, r.y, r.w, r.h, 18);
-      ctx.lineWidth = 2; ctx.strokeStyle = rgb(T.wall);
-      if (low || missing) ctx.setLineDash([7, 6]);
-      ctx.stroke(); ctx.setLineDash([]);
-      // door gap
-      ctx.fillStyle = rgb(T.corridor); ctx.fillRect(r.door.x - 22, r.door.y - 3, 44, 6);
-
-      // hover outline
-      if (S.hover === g) { roundRect(r.x - 3, r.y - 3, r.w + 6, r.h + 6, 21); ctx.strokeStyle = rgb(T.accent, 0.8); ctx.lineWidth = 2.5; ctx.stroke(); }
-
-      // intervention barrier
-      if (targets.includes(g)) {
-        const pulse = reduceMotion ? 0.5 : 0.5 + 0.5 * Math.sin(time * 2.4);
-        roundRect(r.x - 4, r.y - 4, r.w + 8, r.h + 8, 22);
-        ctx.strokeStyle = rgb(T.safe, 0.55 + 0.35 * pulse); ctx.lineWidth = S.strategy === "whole_hospital" ? 2 : 4; ctx.stroke();
-        if (S.strategy !== "whole_hospital") drawShield(r.x + r.w - 30, r.y + 30);
-      }
-      // superspreader ripple
-      if (S.scene === 3 && g === topSpreadWard && !reduceMotion) {
-        for (let i = 0; i < 3; i++) {
-          const ph = ((time * 0.45 + i / 3) % 1);
-          ctx.beginPath(); ctx.arc(r.x + r.w / 2, r.y + r.h / 2 + 20, 40 + ph * 170, 0, Math.PI * 2);
-          ctx.strokeStyle = rgb(T.accent, 0.35 * (1 - ph)); ctx.lineWidth = 2; ctx.stroke();
-        }
-      }
-      drawRoomLabel(r);
-      ctx.restore();
-    });
-  }
-
-  // how bright each room is in the current scene (1 = in focus)
-  function focusOf(g) {
-    if (S.hover) return g === S.hover ? 1 : 0.45;
-    if (S.scene === 2) return g === S.fcWard ? 1 : 0.3;
-    if (S.scene === 3) return g === topSpreadWard ? 1 : 0.4;
-    if (S.scene === 4) {
-      const t = targetedWards();
-      return !t.length || S.strategy === "whole_hospital" ? 1 : (t.includes(g) ? 1 : 0.4);
-    }
-    return 1;
-  }
-
   function drawShield(x, y) {
     ctx.save(); ctx.translate(x, y);
     ctx.beginPath(); ctx.moveTo(0, -13); ctx.lineTo(11, -8); ctx.lineTo(10, 3); ctx.quadraticCurveTo(7, 11, 0, 15); ctx.quadraticCurveTo(-7, 11, -10, 3); ctx.lineTo(-11, -8); ctx.closePath();
@@ -224,53 +137,218 @@
   }
 
   function isLow(g) {
-    if (S.scene !== 0 && S.scene !== 1 && S.scene !== 2) return false;
-    const r = weekOf(S.scene === 2 ? S.fcWeek : S.week).groups[g];
+    const r = weekOf(S.week).groups[g];
     return r ? r.low_n : false;
   }
 
-  function drawRoomLabel(r) {
-    const g = r.g, p = prevForMap(g);
-    const lx = r.x + 18, ly = r.top ? r.y + 30 : r.y + 30;
-    ctx.textAlign = "left"; ctx.fillStyle = rgb(T.ink); ctx.font = "700 17px Geist, Inter, system-ui, sans-serif";
-    ctx.fillText(g, lx, ly);
-    // "#1 spreader" badge in the superspreader scene (ground truth from simulation)
-    if (S.scene === 3 && g === topSpreadWard) {
-      const nw = ctx.measureText(g).width, bx = lx + nw + 10, label = "#1 SPREADER";
-      ctx.font = "750 10.5px Geist, Inter, system-ui, sans-serif"; const bw = ctx.measureText(label).width + 16;
-      roundRect(bx, ly - 14, bw, 19, 9.5); ctx.fillStyle = rgb(T.pos); ctx.fill();
-      ctx.fillStyle = "#fff"; ctx.fillText(label, bx + 8, ly);
-    }
-    ctx.fillStyle = rgb(T.muted); ctx.font = "500 12px Geist, Inter, system-ui, sans-serif";
-    const pp = D.people[g];
-    let sub = pp.patients ? `${pp.patients} patients · ${pp.staff} staff` : `${pp.staff} staff (no beds)`;
-    const wkRow = S.scene <= 2 ? weekOf(S.scene === 2 ? S.fcWeek : S.week).groups[g] : null;
-    if (S.scene <= 1) sub = wkRow ? `${wkRow.positive} of ${wkRow.tested} tested carry MRSA` : "nobody tested this week";
-    if (S.scene === 2) {
-      const f = fcPoint(MODEL, g, S.fcWeek);
-      sub = f ? `real share · Koopman forecast ${pct(f.pred)}` : "real share · no forecast";
-    } else if (S.scene === 3) {
-      const w = D.superspreader.wards.find((s) => s.ward === g);
-      sub = `halving its contacts saves ${fmt(w.drop)} MRSA-days`;
-    } else if (S.scene === 4) sub = "usual share carrying MRSA";
-    ctx.fillText(sub, lx, ly + 18);
-    // carrier share bar
-    const bx0 = lx, bw0 = r.w - 36, by0 = ly + 30;
-    roundRect(bx0, by0, bw0, 6, 3); ctx.fillStyle = rgb(T.line); ctx.fill();
-    if (p != null) {
-      r.barP = r.barP == null ? p : lerp(r.barP, p, 0.12);
-      if (r.barP > 0.003) { roundRect(bx0, by0, Math.max(6, bw0 * r.barP), 6, 3); ctx.fillStyle = rgb(T.pos); ctx.fill(); }
-    }
+  // ======================================================================
+  // Scene: The hospital, as "10 people per ward". Red = carries MRSA.
+  // ======================================================================
+  function drawHospital(time) {
+    ctx.fillStyle = rgb(T.corridor); ctx.fillRect(0, 0, W, H);
+    G.forEach((g) => {
+      const r = ROOM[g], row = weekOf(S.week).groups[g], p = row ? row.p : null;
+      const hov = S.hover === g;
+      ctx.save(); ctx.shadowColor = "rgba(40,30,70,0.10)"; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6;
+      roundRect(r.x, r.y, r.w, r.h, 18); ctx.fillStyle = rgb(T.floor); ctx.fill(); ctx.restore();
+      roundRect(r.x, r.y, r.w, r.h, 18); ctx.lineWidth = hov ? 2.5 : 1.5;
+      ctx.strokeStyle = hov ? rgb(T.accent) : rgb(T.wall); if (row && row.low_n) ctx.setLineDash([6, 6]); ctx.stroke(); ctx.setLineDash([]);
+      // header
+      ctx.textAlign = "left"; ctx.fillStyle = rgb(T.ink); ctx.font = "650 19px Geist, Inter, system-ui, sans-serif";
+      ctx.fillText(g, r.x + 22, r.y + 38);
+      ctx.fillStyle = rgb(T.muted); ctx.font = "500 12.5px Geist, Inter, system-ui, sans-serif";
+      ctx.fillText(row ? `${row.tested} people tested${row.low_n ? " · few tests" : ""}` : "nobody tested this week", r.x + 22, r.y + 60);
+      ctx.textAlign = "right";
+      if (p == null) { ctx.fillStyle = rgb(T.muted); ctx.font = "600 15px Geist, Inter, system-ui, sans-serif"; ctx.fillText("—", r.x + r.w - 22, r.y + 40); }
+      else {
+        const k = Math.round(p * PER_CARD);
+        ctx.fillStyle = k ? rgb(T.pos) : rgb(T.ink); ctx.font = "700 30px Geist, Inter, system-ui, sans-serif";
+        ctx.fillText(`${k} in ${PER_CARD}`, r.x + r.w - 22, r.y + 44);
+        ctx.fillStyle = rgb(T.muted); ctx.font = "500 12.5px Geist, Inter, system-ui, sans-serif"; ctx.fillText(pct(p) + " exactly", r.x + r.w - 22, r.y + 63);
+      }
+    });
+    icons.forEach((f) => drawFigure(f, time));
+  }
 
-    ctx.textAlign = "right";
-    const rx = r.x + r.w - 18;
-    if (p == null) {
-      ctx.fillStyle = rgb(T.muted); ctx.font = "600 13px Geist, Inter, system-ui, sans-serif"; ctx.fillText("not tested", rx, ly);
-    } else {
-      ctx.fillStyle = rgb(mix(T.ink, T.pos, clamp(p * 2.2, 0, 1))); ctx.font = "750 24px Geist, Inter, system-ui, sans-serif";
-      ctx.fillText(pct(p), rx - (S.scene === 4 && targetedWards().includes(g) && S.strategy !== "whole_hospital" ? 30 : 0), ly + 2);
-      if (isLow(g)) { ctx.fillStyle = rgb(T.muted); ctx.font = "600 10.5px Geist, Inter, system-ui, sans-serif"; ctx.fillText("few tests", rx, ly + 18); }
+  function updateIcons(dt) {
+    icons.forEach((f) => {
+      const row = weekOf(S.week).groups[f.g], k = row ? Math.round(row.p * PER_CARD) : null;
+      const wantU = k == null ? 1 : 0, wantC = k == null ? 0 : (f.rank < k ? 1 : 0);
+      const rate = reduceMotion ? 1 : clamp(dt * 4, 0, 1);
+      f.u = lerp(f.u, wantU, rate);
+      // the colour change ripples along the row
+      f.delay = (f.c < 0.5) !== (wantC < 0.5) ? (f.delay == null ? f.rank * 0.05 : f.delay - dt) : null;
+      if (f.delay == null || f.delay <= 0) f.c = lerp(f.c, wantC, rate);
+      f.phase += dt * 2; f.blink -= dt; if (f.blink < 0) f.blink = rr(2.5, 6);
+      f.turnT -= dt; if (f.turnT < 0) { f.turnT = rr(2, 8); f.dir = -f.dir; }
+    });
+  }
+
+  // ======================================================================
+  // Scenes: Contacts / Superspreader / Intervention, as one ward network.
+  // Circle = ward (size = people), ring = share of its contact time that
+  // stays inside, line = contact between two wards (thicker = more hours).
+  // ======================================================================
+  function linkStyle(l) {
+    const t = l.hours / linkMax, tw = targetedWards();
+    let w = 1.5 + 11 * t, a = 0.16 + 0.5 * t, col = T.accent, flow = 0.5 + 2.5 * t;
+    if (S.scene === 3) {
+      const hot = l.a === topSpreadWard || l.b === topSpreadWard;
+      col = hot ? T.pos : T.muted; a = hot ? 0.3 + 0.55 * t : 0.08 + 0.15 * t;
     }
+    if (S.scene === 4 && S.strategy !== "whole_hospital" && (tw.includes(l.a) || tw.includes(l.b))) { w *= 1 - S.R; a *= 1 - S.R * 0.7; flow *= 1 - S.R; }
+    if (S.scene === 4 && S.strategy === "whole_hospital") { w *= 1 - S.R / 3; flow *= 1 - S.R / 3; }
+    if (S.hover && l.a !== S.hover && l.b !== S.hover) a *= 0.35;
+    return { w, a, col, flow };
+  }
+
+  function drawNetwork(time) {
+    ctx.fillStyle = rgb(T.corridor); ctx.fillRect(0, 0, W, H);
+    // soft centre glow
+    const grd = ctx.createRadialGradient(500, 318, 20, 500, 318, 360);
+    grd.addColorStop(0, rgb(T.accent, 0.08)); grd.addColorStop(1, rgb(T.accent, 0)); ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
+
+    const links = [...D.contacts.links].sort((a, b) => a.hours - b.hours);
+    links.forEach((l) => {
+      const st = linkStyle(l), [, , cx, cy] = linkPoint(l, 0), A = NODE[l.a], B = NODE[l.b];
+      ctx.strokeStyle = rgb(st.col, st.a); ctx.lineWidth = Math.max(0.6, st.w); ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.quadraticCurveTo(cx, cy, B.x, B.y); ctx.stroke();
+      // moving dots = contact flowing along the link
+      if (!reduceMotion && st.flow > 0.05) {
+        const n = Math.max(1, Math.round(st.flow));
+        for (let k = 0; k < n; k++) {
+          const t = (time * 0.12 * (0.6 + st.flow / 3) + k / n + l.hours * 0.001) % 1, [px, py] = linkPoint(l, t);
+          ctx.fillStyle = rgb(st.col, Math.min(1, st.a + 0.35)); ctx.beginPath(); ctx.arc(px, py, 2.4 + st.w * 0.16, 0, 7); ctx.fill();
+        }
+      }
+    });
+    // labels for the three busiest links (contacts scene only)
+    if (S.scene === 1) {
+      [...D.contacts.links].sort((a, b) => b.hours - a.hours).slice(0, 3).forEach((l) => {
+        const [mx, my] = linkPoint(l, 0.5), label = fmt(l.hours) + " h";
+        ctx.font = "600 12px Geist, Inter, system-ui, sans-serif"; const tw = ctx.measureText(label).width + 16;
+        roundRect(mx - tw / 2, my - 11, tw, 22, 11); ctx.fillStyle = rgb(T.surface); ctx.fill();
+        ctx.strokeStyle = rgb(T.accent, 0.45); ctx.lineWidth = 1; ctx.stroke();
+        ctx.fillStyle = rgb(T.ink); ctx.textAlign = "center"; ctx.fillText(label, mx, my + 4);
+      });
+    }
+    // centre caption: intervention result
+    if (S.scene === 4) {
+      const r = interRow(S.strategy);
+      ctx.save(); ctx.shadowColor = "rgba(40,30,70,0.14)"; ctx.shadowBlur = 20; ctx.shadowOffsetY = 6;
+      roundRect(400, 282, 200, 84, 18); ctx.fillStyle = rgb(T.surface); ctx.fill(); ctx.restore();
+      ctx.textAlign = "center"; ctx.fillStyle = rgb(T.safe); ctx.font = "700 40px Geist, Inter, system-ui, sans-serif";
+      ctx.fillText(r ? "−" + fmt(r.drop_mean) : "—", 500, 326);
+      ctx.fillStyle = rgb(T.muted); ctx.font = "500 13px Geist, Inter, system-ui, sans-serif"; ctx.fillText("MRSA-days over 16 weeks", 500, 350);
+    }
+    G.forEach((g) => drawNode(NODE[g], time));
+  }
+
+  function drawNode(n, time) {
+    const g = n.g, tw = targetedWards(), sup = D.superspreader.wards.find((w) => w.ward === g);
+    const dim = (S.hover && S.hover !== g) || (S.scene === 3 && g !== topSpreadWard && !S.hover) ? 0.55 : 1;
+    ctx.save(); ctx.globalAlpha = dim;
+    // superspreader: ripple from the #1 ward
+    if (S.scene === 3 && g === topSpreadWard && !reduceMotion) {
+      for (let i = 0; i < 3; i++) {
+        const ph = (time * 0.4 + i / 3) % 1;
+        ctx.beginPath(); ctx.arc(n.x, n.y, n.r + 10 + ph * 70, 0, 7); ctx.strokeStyle = rgb(T.pos, 0.4 * (1 - ph)); ctx.lineWidth = 2; ctx.stroke();
+      }
+    }
+    // body
+    ctx.save(); ctx.shadowColor = "rgba(40,30,70,0.16)"; ctx.shadowBlur = 20; ctx.shadowOffsetY = 6;
+    ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, 7); ctx.fillStyle = rgb(T.surface); ctx.fill(); ctx.restore();
+    if (S.scene === 3) { ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, 7); ctx.fillStyle = rgb(T.pos, 0.08 + 0.32 * sup.drop / dropMax); ctx.fill(); }
+    // ring: share of contact time spent inside the ward
+    const share = D.contacts.within_share[g], rr2 = n.r + 7, shielded = S.scene === 4 && tw.includes(g) && S.strategy !== "whole_hospital";
+    ctx.lineCap = "round"; ctx.lineWidth = 6;
+    if (S.scene === 1) {
+      ctx.beginPath(); ctx.arc(n.x, n.y, rr2, 0, 7); ctx.strokeStyle = rgb(T.line); ctx.stroke();
+      n.ring = n.ring == null ? 0 : lerp(n.ring, share, reduceMotion ? 1 : 0.06);
+      ctx.beginPath(); ctx.arc(n.x, n.y, rr2, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * n.ring); ctx.strokeStyle = rgb(T.accent); ctx.stroke();
+    } else n.ring = 0;
+    if (shielded) { ctx.beginPath(); ctx.arc(n.x, n.y, rr2, 0, 7); ctx.strokeStyle = rgb(T.safe); ctx.stroke(); }
+    // contents
+    ctx.textAlign = "center"; ctx.fillStyle = rgb(T.ink);
+    if (S.scene === 1) {
+      ctx.font = "700 20px Geist, Inter, system-ui, sans-serif"; ctx.fillText(pct(share), n.x, n.y + 3);
+      ctx.fillStyle = rgb(T.muted); ctx.font = "500 10.5px Geist, Inter, system-ui, sans-serif"; ctx.fillText("inside", n.x, n.y + 18);
+    } else if (S.scene === 3) {
+      ctx.fillStyle = g === topSpreadWard ? rgb(T.pos) : rgb(T.ink); ctx.font = "700 20px Geist, Inter, system-ui, sans-serif"; ctx.fillText(fmt(sup.drop), n.x, n.y + 3);
+      ctx.fillStyle = rgb(T.muted); ctx.font = "500 10.5px Geist, Inter, system-ui, sans-serif"; ctx.fillText("days saved", n.x, n.y + 18);
+    } else {
+      ctx.font = "700 18px Geist, Inter, system-ui, sans-serif"; ctx.fillText(pct(meanPrev[g]), n.x, n.y + 3);
+      ctx.fillStyle = rgb(T.muted); ctx.font = "500 10.5px Geist, Inter, system-ui, sans-serif"; ctx.fillText("carry MRSA", n.x, n.y + 18);
+    }
+    // name under the circle
+    const below = n.y > 318 || Math.abs(n.y - 318) < 40;
+    const ny = n.y + (n.y < 200 ? -(n.r + 20) : n.r + 30);
+    ctx.fillStyle = rgb(T.ink); ctx.font = "650 15px Geist, Inter, system-ui, sans-serif"; ctx.fillText(g, n.x, ny);
+    if (S.scene === 3 && g === topSpreadWard) {
+      ctx.font = "750 10.5px Geist, Inter, system-ui, sans-serif"; const label = "#1 SPREADER", bw = ctx.measureText(label).width + 16;
+      const bx = n.x + n.r + 16; roundRect(bx, n.y - 10, bw, 20, 10); ctx.fillStyle = rgb(T.pos); ctx.fill();
+      ctx.fillStyle = "#fff"; ctx.textAlign = "left"; ctx.fillText(label, bx + 8, n.y + 4);
+    }
+    if (S.scene === 4 && tw.includes(g) && S.strategy !== "whole_hospital") drawShield(n.x + n.r * 0.78, n.y - n.r * 0.78);
+    ctx.restore();
+    void below;
+  }
+
+  // ======================================================================
+  // Scene: Forecast, as "how close was each guess" for one week.
+  // ======================================================================
+  const FC = { x0: 210, x1: 940, y0: 128, dy: 72 };
+  const fcMax = Math.ceil(Math.max(...D.forecast.points.flatMap((p) => [p.pred, p.actual]).filter((v) => v != null)) * 10 + 0.5) / 10;
+  const fcX = (v) => FC.x0 + (FC.x1 - FC.x0) * clamp(v, 0, fcMax) / fcMax;
+  const fcDots = {};
+  function drawForecast() {
+    ctx.fillStyle = rgb(T.corridor); ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = "left"; ctx.fillStyle = rgb(T.ink); ctx.font = "650 20px Geist, Inter, system-ui, sans-serif";
+    ctx.fillText(`Week ${S.fcWeek}: the real MRSA share, and two guesses made a week earlier`, 40, 50);
+    // legend
+    const lg = [["Real", T.pos, true], [`Koopman (${MODEL})`, T.accent, true], ["Same as last week", T.muted, false]];
+    let lx = 40; ctx.font = "500 13px Geist, Inter, system-ui, sans-serif";
+    lg.forEach(([t, c, solid]) => {
+      ctx.beginPath(); ctx.arc(lx + 6, 78, 6, 0, 7);
+      if (solid) { ctx.fillStyle = rgb(c); ctx.fill(); } else { ctx.strokeStyle = rgb(c); ctx.lineWidth = 2.2; ctx.stroke(); }
+      ctx.fillStyle = rgb(T.muted); ctx.fillText(t, lx + 18, 83); lx += ctx.measureText(t).width + 44;
+    });
+    // grid
+    for (let v = 0; v <= fcMax + 1e-9; v += 0.1) {
+      const x = fcX(v); ctx.strokeStyle = rgb(T.line); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, FC.y0 - 22); ctx.lineTo(x, FC.y0 + FC.dy * (G.length - 1) + 24); ctx.stroke();
+      ctx.fillStyle = rgb(T.muted); ctx.textAlign = "center"; ctx.font = "500 12px Geist, Inter, system-ui, sans-serif";
+      ctx.fillText(Math.round(v * 100) + "%", x, FC.y0 + FC.dy * (G.length - 1) + 44);
+    }
+    let errK = 0, errP = 0, n = 0;
+    G.forEach((g, i) => {
+      const y = FC.y0 + i * FC.dy, act = prevAt(S.fcWeek, g), k = fcPoint(MODEL, g, S.fcWeek), p = fcPoint("persistence", g, S.fcWeek);
+      if (g === S.fcWard || g === S.hover) { roundRect(24, y - 28, 952, 56, 12); ctx.fillStyle = rgb(T.accent, g === S.fcWard ? 0.09 : 0.05); ctx.fill(); }
+      ctx.textAlign = "left"; ctx.fillStyle = rgb(T.ink); ctx.font = "600 15px Geist, Inter, system-ui, sans-serif"; ctx.fillText(g, 40, y + 5);
+      if (act == null || !k) { ctx.fillStyle = rgb(T.muted); ctx.font = "500 13px Geist, Inter, system-ui, sans-serif"; ctx.fillText("not tested this week", FC.x0, y + 5); return; }
+      const d = fcDots[g] || (fcDots[g] = { a: act, k: k.pred, p: p ? p.pred : act });
+      const ease = reduceMotion ? 1 : 0.12;
+      d.a = lerp(d.a, act, ease); d.k = lerp(d.k, k.pred, ease); d.p = lerp(d.p, p ? p.pred : act, ease);
+      // miss bars from the real value to each guess
+      ctx.lineCap = "round";
+      ctx.strokeStyle = rgb(T.muted, 0.45); ctx.lineWidth = 3; ctx.setLineDash([2, 6]); ctx.beginPath(); ctx.moveTo(fcX(d.a), y + 9); ctx.lineTo(fcX(d.p), y + 9); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = rgb(T.accent, 0.5); ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(fcX(d.a), y - 9); ctx.lineTo(fcX(d.k), y - 9); ctx.stroke();
+      ctx.beginPath(); ctx.arc(fcX(d.p), y + 9, 7, 0, 7); ctx.fillStyle = rgb(T.surface); ctx.fill(); ctx.strokeStyle = rgb(T.muted); ctx.lineWidth = 2.4; ctx.stroke();
+      ctx.beginPath(); ctx.arc(fcX(d.k), y - 9, 7.5, 0, 7); ctx.fillStyle = rgb(T.accent); ctx.fill();
+      ctx.beginPath(); ctx.arc(fcX(d.a), y, 9.5, 0, 7); ctx.fillStyle = rgb(T.pos); ctx.fill(); ctx.strokeStyle = rgb(T.surface); ctx.lineWidth = 2.5; ctx.stroke();
+      errK += Math.abs(k.pred - act); errP += Math.abs((p ? p.pred : act) - act); n++;
+    });
+    if (n) {
+      ctx.textAlign = "left"; ctx.font = "500 13.5px Geist, Inter, system-ui, sans-serif"; ctx.fillStyle = rgb(T.muted);
+      ctx.fillText(`Average miss this week: Koopman ${(errK / n * 100).toFixed(1)} points · same as last week ${(errP / n * 100).toFixed(1)} points`, 40, H - 22);
+    }
+  }
+
+  // which ward is under the pointer, in canvas units
+  function hitWard(x, y) {
+    if (S.scene === 0) return G.find((g) => { const r = ROOM[g]; return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h; }) || null;
+    if (S.scene === 2) { const i = Math.round((y - FC.y0) / FC.dy); return i >= 0 && i < G.length && Math.abs(y - FC.y0 - i * FC.dy) < 30 ? G[i] : null; }
+    return G.find((g) => Math.hypot(x - NODE[g].x, y - NODE[g].y) < NODE[g].r + 12) || null;
   }
 
   function drawGerm(x, y, r, time) {
@@ -325,89 +403,6 @@
     if (f.c > 0.5) { ctx.moveTo(-1.3 + dx, -18); ctx.lineTo(1.5 + dx, -18); } else ctx.arc(dx * 0.6, -18.8, 1.6, 0.2 * Math.PI, 0.8 * Math.PI);
     ctx.stroke();
     ctx.restore();
-  }
-
-  function drawLinks(time) {
-    if (S.scene !== 1) return;
-    const top = [...D.contacts.links].sort((a, b) => b.hours - a.hours).slice(0, 3);
-    top.forEach((l, i) => {
-      const A = ROOM[l.a], B = ROOM[l.b];
-      const ax = A.door.x, ay = A.door.y + (A.top ? -40 : 40), bx = B.door.x, by = B.door.y + (B.top ? -40 : 40);
-      const cx = (ax + bx) / 2, cy = CORR_Y + (A.top === B.top ? (A.top ? 70 : -70) : 0);
-      const w = 3 + 7 * (l.hours / linkMax);
-      ctx.strokeStyle = rgb(T.accent, 0.3); ctx.lineWidth = w; ctx.lineCap = "round";
-      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.quadraticCurveTo(cx, cy, bx, by); ctx.stroke();
-      {
-        const mx = 0.25 * ax + 0.5 * cx + 0.25 * bx, my = 0.25 * ay + 0.5 * cy + 0.25 * by;
-        const label = fmt(l.hours) + " h";
-        ctx.font = "650 11.5px Geist, Inter, system-ui, sans-serif"; ctx.textAlign = "center";
-        const tw = ctx.measureText(label).width + 14;
-        roundRect(mx - tw / 2, my - 11, tw, 22, 11); ctx.fillStyle = rgb(T.surface, 0.95); ctx.fill();
-        ctx.strokeStyle = rgb(T.accent, 0.5); ctx.lineWidth = 1; ctx.stroke();
-        ctx.fillStyle = rgb(T.ink); ctx.fillText(label, mx, my + 4);
-      }
-    });
-  }
-
-  // ---------- simulation of decoration ----------
-  let firstFrame = true;
-  function updateFigures(dt) {
-    // colonised count per ward follows the data; same people stay positive (fixed rank)
-    const targets = {};
-    G.forEach((g) => { const p = prevForMap(g); targets[g] = p == null ? null : Math.round(p * nFigByWard[g]); });
-    figures.forEach((f) => {
-      const k = targets[f.g];
-      const wantU = k == null ? 1 : 0, wantC = k == null ? 0 : (f.rank < k ? 1 : 0);
-      // stagger the colour change along the row so a week change "ripples"
-      const rate = reduceMotion || firstFrame ? 1 : clamp(dt * 3.2, 0, 1);
-      if (firstFrame) f.delay = 0;
-      f.u = lerp(f.u, wantU, rate);
-      f.delay = f.c < 0.5 !== (wantC < 0.5) ? (f.delay == null ? f.rank * 0.035 : f.delay - dt) : null;
-      if (f.delay == null || f.delay <= 0) f.c = lerp(f.c, wantC, rate);
-      f.blink -= dt; if (f.blink < 0) f.blink = rr(2.5, 6);
-      // stand in their slot with a gentle idle sway; look around now and then
-      f.phase += dt * 2; f.x = f.sx; f.y = f.sy; f.moving = false;
-      f.turnT -= dt; if (f.turnT < 0) { f.turnT = rr(2, 8); f.dir = -f.dir; }
-    });
-    firstFrame = false;
-    G.forEach((g) => { const r = ROOM[g], want = focusOf(g); r.fa = r.fa == null ? want : lerp(r.fa, want, reduceMotion ? 1 : clamp(dt * 5, 0, 1)); });
-    figures.forEach((f) => { f.alpha = ROOM[f.g].fa; });
-  }
-
-  function updateVisitors(dt) {
-    if (reduceMotion) { visitors.length = 0; return; }
-    const base = S.scene === 1 ? 1.2 : S.scene === 2 ? 0 : 0.4; // visits per second at the busiest link (none while forecasting)
-    const cap = S.scene === 1 ? 7 : 4;
-    const tw = targetedWards();
-    D.contacts.links.forEach((l) => {
-      let rate = base * l.hours / linkMax;
-      if (S.scene === 4 && (tw.includes(l.a) || tw.includes(l.b))) rate *= (1 - S.R);
-      if (visitors.length < cap && rand() < rate * dt) {
-        // in the spreader scene, walkers leave from the #1 spreader ward
-        if (S.scene === 3 && (l.a === topSpreadWard || l.b === topSpreadWard)) spawnVisitor(topSpreadWard, l.a === topSpreadWard ? l.b : l.a);
-        else rand() < 0.5 ? spawnVisitor(l.a, l.b) : spawnVisitor(l.b, l.a);
-      }
-    });
-    visitors.forEach((v) => {
-      if (v.stay > 0) { v.stay -= dt; v.moving = false; if (v.stay <= 0) { v.fwd = false; v.seg = v.path.length - 1; } return; }
-      const i = v.seg, j = v.fwd ? i + 1 : i - 1;
-      if (j < 0 || j >= v.path.length) { if (v.fwd) v.stay = rr(1, 2.5); else v.done = true; return; }
-      const P = v.path[j], dx = P.x - v.x, dy = P.y - v.y, d = Math.hypot(dx, dy);
-      v.moving = true; v.dir = dx >= 0 ? 1 : -1; v.phase += dt * 12; v.blink -= dt; if (v.blink < 0) v.blink = rr(2, 6);
-      const m = Math.min(d, 70 * dt);
-      if (d < 1) { v.seg = j; return; }
-      v.x += dx / d * m; v.y += dy / d * m;
-      if (v.c > 0.5 && v.fwd) { v.trailT -= dt; if (v.trailT <= 0) { v.trailT = 0.05; v.trail.push({ x: v.x, y: v.y }); if (v.trail.length > 40) v.trail.shift(); } }
-    });
-    for (let i = visitors.length - 1; i >= 0; i--) if (visitors[i].done) visitors.splice(i, 1);
-  }
-
-  // red dotted footprints behind a walker who carries MRSA between wards
-  function drawTrails() {
-    visitors.forEach((v) => {
-      const n = v.trail.length;
-      v.trail.forEach((p, i) => { if (i % 2) return; ctx.fillStyle = rgb(T.pos, 0.55 * (i + 1) / n); ctx.beginPath(); ctx.arc(p.x, p.y - 2, 2.2, 0, 7); ctx.fill(); });
-    });
   }
 
   // ======================================================================
@@ -536,7 +531,6 @@
     ctx.restore();
     roundRect(R.x, R.y, R.w, R.h, 22); ctx.strokeStyle = rgb(T.wall); ctx.lineWidth = 2; ctx.stroke();
     ctx.textAlign = "left"; ctx.fillStyle = rgb(T.ink); ctx.font = "750 20px Geist, Inter, system-ui, sans-serif"; ctx.fillText(ST.ward + " ward", R.x + 24, R.y + 38);
-    ctx.fillStyle = rgb(T.muted); ctx.font = "500 13px Geist, Inter, system-ui, sans-serif"; ctx.fillText("Three real people from the data (anonymised). Everyone else is faded.", R.x + 24, R.y + 58);
     pill(R.x + R.w - 92, R.y + 34, fmtD(SS.day, true), rgb(T.ink), rgb(T.surface), "700 14px Geist, Inter, system-ui, sans-serif");
 
     // contact: ring around the pair + minute counter + possible-route particles
@@ -627,17 +621,14 @@
       requestAnimationFrame(frame);
       return;
     }
-    if (S.playing && (S.scene === 0 || S.scene === 1)) {
+    if (S.playing && S.scene === 0) {
       S.playAcc += dt;
       if (S.playAcc > 1.7) { S.playAcc = 0; S.week = (S.week + 1) % D.weeks.length; syncWeekUI(); }
     }
-    updateFigures(dt); updateVisitors(dt);
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
-    drawFloor(clock);
-    drawLinks(clock);
-    drawTrails();
-    const all = figures.concat(visitors).sort((a, b) => a.y - b.y);
-    all.forEach((f) => drawFigure(f, clock));
+    if (S.scene === 0) { updateIcons(dt); drawHospital(clock); }
+    else if (S.scene === 2) drawForecast();
+    else drawNetwork(clock);
     drawFade(dt);
     requestAnimationFrame(frame);
   }
@@ -653,18 +644,15 @@
   // ---------- tooltip / hover ----------
   function roomAt(ev) {
     if (S.scene === STORY) return null;
-    const b = cv.getBoundingClientRect(), x = (ev.clientX - b.left) / b.width * W, y = (ev.clientY - b.top) / b.height * H;
-    return G.find((g) => { const r = ROOM[g]; return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h; }) || null;
+    const b = cv.getBoundingClientRect();
+    return hitWard((ev.clientX - b.left) / b.width * W, (ev.clientY - b.top) / b.height * H);
   }
   cv.addEventListener("mousemove", (ev) => {
     const g = roomAt(ev); S.hover = g; cv.style.cursor = g ? "pointer" : "default";
-    const tip = $("tip");
+    const tip = $("tip"), b = cv.getBoundingClientRect();
     if (!g) { tip.hidden = true; return; }
-    const r = ROOM[g], b = cv.getBoundingClientRect();
-    tip.style.left = ((r.x + r.w / 2) / W * b.width) + "px"; tip.style.top = (r.y / H * b.height + (r.top ? 6 : 0)) + "px";
-    if (r.top) tip.style.top = (r.y / H * b.height + 8) + "px";
+    tip.style.left = (ev.clientX - b.left) + "px"; tip.style.top = (ev.clientY - b.top) + "px";
     tip.innerHTML = tipHtml(g); tip.hidden = false;
-    if (r.top) tip.style.transform = "translate(-50%, 8px)"; else tip.style.transform = "";
   });
   cv.addEventListener("mouseleave", () => { S.hover = null; $("tip").hidden = true; });
   cv.addEventListener("click", (ev) => {
@@ -674,28 +662,40 @@
 
   function tipHtml(g) {
     const pp = D.people[g];
-    let rows = `<div class="row">People in contact data<b>${pp.patients + pp.staff}</b></div>`;
-    if (S.scene <= 2) {
+    let rows = `<div class="row">People<b>${pp.patients} patients · ${pp.staff} staff</b></div>`;
+    if (S.scene === 0 || S.scene === 2) {
       const wk = S.scene === 2 ? S.fcWeek : S.week, r = weekOf(wk).groups[g];
-      rows += r ? `<div class="row">Tested in week ${wk}<b>${r.tested}</b></div><div class="row">MRSA-positive<b>${r.positive} (${pct(r.p)})</b></div>`
+      rows += r ? `<div class="row">Tested in week ${wk}<b>${r.tested}</b></div><div class="row">Carry MRSA<b>${r.positive} (${pct(r.p)})</b></div>`
                : `<div class="row">Week ${wk}<b>nobody tested</b></div>`;
-      if (S.scene === 1) rows += `<div class="row">Time spent inside own group<b>${pct(D.contacts.within_share[g])}</b></div>`;
+    } else if (S.scene === 1) {
+      rows += `<div class="row">Contact time inside the ward<b>${pct(D.contacts.within_share[g])}</b></div>`;
     } else if (S.scene === 3) {
       const w = D.superspreader.wards.find((s) => s.ward === g);
-      rows += `<div class="row">Cut its contacts 50%: days saved<b>${fmt(w.drop)}</b></div><div class="row">Koopman mode weight<b>${pct(w.koopman)}</b></div>`;
+      rows += `<div class="row">Halve its contacts: MRSA-days saved<b>${fmt(w.drop)}</b></div>`;
     } else {
-      rows += `<div class="row">Average MRSA share<b>${pct(meanPrev[g])}</b></div>`;
+      rows += `<div class="row">Usual share carrying MRSA<b>${pct(meanPrev[g])}</b></div>`;
     }
     return `<h4>${g}</h4>${rows}`;
   }
+
+  // ---------- legends under the stage ----------
+  const LEGEND = {
+    people: `<span><i class="dot pos"></i><b>Red = carries MRSA</b></span><span><i class="dot neg"></i>Grey = no MRSA</span>
+      <span><i class="dot ghost"></i>Faded = nobody tested</span><span class="legend-note">Each card = 10 people tested on that ward</span>`,
+    1: `<span><i class="lg-node"></i>Circle = a ward (bigger = more people)</span><span><i class="lg-ring"></i>Ring = contact time kept inside</span>
+      <span><i class="lg-line"></i>Line = contact between wards (thicker = more)</span>`,
+    3: `<span><i class="lg-node"></i>Number = MRSA-days saved by halving that ward's contacts</span><span><i class="lg-line" style="background:var(--pos)"></i>Red lines = the #1 ward's contacts</span>`,
+    4: `<span><i class="lg-node" style="box-shadow:0 0 0 3px var(--safe)"></i>Green ring + shield = targeted ward</span><span><i class="lg-line"></i>Its lines thin out by the cut</span>
+      <span class="legend-note">Centre = MRSA-days avoided</span>`,
+  };
 
   // ---------- scenes ----------
   const SCENES = [
     { id: STORY, name: "How it spreads", render: sceneStory, bar: storyBar },
     { id: 0, name: "Hospital", render: sceneHospital, bar: weekBar },
-    { id: 1, name: "Contacts", render: sceneContacts, bar: weekBar },
+    { id: 1, name: "Contacts", render: sceneContacts, bar: () => `<span class="bar-hint">Hover a ward to see only its links.</span>` },
     { id: 2, name: "Forecast", render: sceneForecast, bar: forecastBar },
-    { id: 3, name: "Superspreader", render: sceneSuper, bar: () => `<span class="bar-hint">The highlighted room is the one whose contacts matter most. Hover any room for its numbers.</span>` },
+    { id: 3, name: "Superspreader", render: sceneSuper, bar: () => `<span class="bar-hint">The number in each circle: MRSA-days saved if that ward's contacts are halved.</span>` },
     { id: 4, name: "Intervention", render: sceneIntervention, bar: interventionBar },
   ];
   const topKoopWard = [...D.superspreader.wards].sort((a, b) => b.koopman - a.koopman)[0].ward;
@@ -724,9 +724,10 @@
   }
   function go(i) {
     S.pos = clamp(i, 0, SCENES.length - 1); S.scene = SCENES[S.pos].id; S.playing = false;
-    visitors.length = 0; S.hover = null; $("tip").hidden = true;
+    S.hover = null; $("tip").hidden = true;
     if (S.scene === STORY) { SS.step = 0; SS.acc = 0; SS.since = 0; SS.playing = true; }
-    $("legend").hidden = S.scene === STORY;
+    $("legend").hidden = S.scene === STORY || S.scene === 2;
+    $("legend").innerHTML = LEGEND[S.scene === 0 ? "people" : S.scene] || "";
     S.fade = 1; // canvas fades through on every scene change
     renderSteps(); renderBar(); renderPanel(true);
   }
@@ -785,7 +786,7 @@
   function forecastBar() {
     const wks = [...new Set(D.forecast.points.map((p) => p.landing_week))].sort((a, b) => a - b);
     return `<span class="bar-label">Week</span><div class="chips">${wks.map((w) => `<button class="chip ${w === S.fcWeek ? "on" : ""}" data-fw="${w}">${w}</button>`).join("")}</div>
-      <span class="bar-hint" style="margin-left:auto">Click a room to chart it</span>`;
+      <span class="bar-hint" style="margin-left:auto">Click a ward to chart it</span>`;
   }
   function interventionBar() {
     return `<span class="bar-label">Wards</span><div class="chips">${[1, 2].map((k) => `<button class="chip ${k === S.k ? "on" : ""}" data-k="${k}">${k}</button>`).join("")}</div>
@@ -874,10 +875,10 @@
     const valid = overall.filter((v) => v != null), mean = valid.reduce((a, b) => a + b, 0) / valid.length;
     return `<p class="kicker">The whole hospital</p>
       <h2>About ${Math.round(mean * 100)}% of people tested each week carried MRSA.</h2>
-      <p>Each room is one ward. <strong>Red figures carry MRSA</strong> and stand at the front, so you can count them. Press play to watch the weeks go by.</p>
+      <p>Each card shows <strong>10 people tested</strong> on one ward. <strong>Red ones carry MRSA.</strong> Press play to watch the weeks go by.</p>
       <div class="big-wrap"><span class="big-number" id="ovNow" style="color:var(--pos)">${pct(overall[S.week])}</span><span>tested positive<br>in the week shown</span></div>
       ${sparkline()}
-      <p class="fine">Dashed room = few or no swabs that week. Gaps are never filled in.</p>`;
+      <p class="fine">Dashed card = only a few people tested that week. Gaps are never filled in.</p>`;
   }
 
   function sceneContacts() {
@@ -887,7 +888,7 @@
     const top = [...D.contacts.links].sort((a, b) => b.hours - a.hours).slice(0, 3);
     return `<p class="kicker">Who meets whom</p>
       <h2>${Math.round(share * 100)}% of contact time stays inside a ward.</h2>
-      <p>The rest happens along a few corridor links. <strong>Staff carrying MRSA leave red footprints</strong> as they walk between wards.</p>
+      <p>Each circle is a ward; its <strong>ring</strong> fills with the share of contact time kept inside. The <strong>lines</strong> between wards are where MRSA can cross.</p>
       <div class="chart-title">The three busiest links <span>contact hours</span></div>
       <ul class="list">${top.map((l) => `<li><div>${l.a} ↔ ${l.b}<div class="mini-bar" style="width:${(l.hours / top[0].hours * 100).toFixed(0)}%"></div></div><b>${fmt(l.hours)} h</b></li>`).join("")}</ul>`;
   }
@@ -899,7 +900,7 @@
       <h2>One week ahead, Koopman ties with "same as last week".</h2>
       <div class="vs"><div><b style="color:var(--accent)" data-count="${(k1 * 100).toFixed(1)}" data-dec="1">${(k1 * 100).toFixed(1)}</b><span>Koopman</span></div><i>vs</i><div><b data-count="${(p1 * 100).toFixed(1)}" data-dec="1">${(p1 * 100).toFixed(1)}</b><span>Same as last week</span></div></div>
       <p class="fine" style="margin-top:-6px">Average miss, in percentage points, over the held-out weeks. Lower is better.</p>
-      <div class="chart-title">${S.fcWard} <span>click a room to switch</span></div>
+      <div class="chart-title">${S.fcWard} <span>click a ward on the left to switch</span></div>
       ${forecastChart(S.fcWard)}`;
   }
 
@@ -997,7 +998,7 @@
     root.dataset.theme = dark ? "light" : "dark"; readTokens();
     try { localStorage.setItem("p30-theme", root.dataset.theme); } catch (e) { /* storage unavailable */ }
   };
-  try { const t = localStorage.getItem("p30-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) { /* storage unavailable */ }
+  if (!LOCK) { try { const t = localStorage.getItem("p30-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) { /* storage unavailable */ } }
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", readTokens);
 
   $("perFigure").textContent = `Each figure ≈ ${D.people_per_figure} people`;
@@ -1005,6 +1006,18 @@
 
   // Embedded: size the host's iframe to the content, so there is no empty
   // band and no inner scrollbar at any window width (same-origin frame).
+  // Embedded: follow the host app's light / dark theme (read from its background).
+  function syncHostTheme() {
+    try {
+      const host = window.parent.document, el = host.querySelector(".stApp") || host.body;
+      const m = getComputedStyle(el).backgroundColor.match(/[\d.]+/g);
+      if (!m) return;
+      const t = 0.299 * m[0] + 0.587 * m[1] + 0.114 * m[2] < 128 ? "dark" : "light";
+      if (document.documentElement.dataset.theme !== t) { document.documentElement.dataset.theme = t; readTokens(); }
+    } catch (e) { /* cross-origin host: keep the system theme */ }
+  }
+  if (LOCK) { syncHostTheme(); setInterval(syncHostTheme, 1200); }
+
   if (LOCK && window.frameElement) {
     const fit = () => {
       try { window.frameElement.style.height = Math.ceil(document.querySelector(".layout").getBoundingClientRect().height + 6) + "px"; }

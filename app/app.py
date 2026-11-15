@@ -66,8 +66,13 @@ def cached_model():
 
 
 @st.cache_data
-def cached_demo(scene):
+def cached_demo(scene, stamp):
+    """Packed scene HTML; `stamp` (the demo files' latest edit time) refreshes the cache after edits."""
     return ad.demo_html(scene)
+
+
+def demo_stamp():
+    return max(f.stat().st_mtime for f in config.DEMO_DIR.iterdir() if f.is_file())
 
 
 def chart(fig, pct_title=None):
@@ -121,7 +126,7 @@ st.markdown(
 
 if scene is not None:
     if config.DEMO_DATA_JS.exists():
-        components.html(cached_demo(scene), height=DEMO_HEIGHT[scene], scrolling=False)
+        components.html(cached_demo(scene, demo_stamp()), height=DEMO_HEIGHT[scene], scrolling=False)
     else:
         st.warning("Demo data missing: run `python -m src.demo_data`, then reload.")
 

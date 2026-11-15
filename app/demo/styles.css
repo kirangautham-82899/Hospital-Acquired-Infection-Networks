@@ -294,8 +294,16 @@ body.embed {
   --pos: #ef7f73; --pos-soft: rgba(239, 127, 115, .16); --safe: #3fb48f;
   --person: #c9c2d6; --cap: #8c83a3; --unk: #ddd7e6;
 }
+/* dark pastel: set by the host theme (data-theme), or the OS when no host theme is known */
+:root[data-theme="dark"] body.embed {
+    --surface: #1d1a26; --surface-2: #221e2d; --ink: #ece9f5; --ink-2: #cfcade; --muted: #a29db3; --line: #2b2737; --line-strong: #3a354a;
+    --floor: #221e2d; --floor-tile: #27233a; --corridor: #1a1723; --wall: #3d3750;
+    --accent: #a99cff; --accent-2: #c3b9ff; --accent-soft: rgba(169, 156, 255, .16);
+    --pos: #ff9e95; --pos-soft: rgba(255, 158, 149, .16); --safe: #7fdcbf;
+    --person: #5d5672; --cap: #a69ec0; --unk: #3d3750;
+  }
 @media (prefers-color-scheme: dark) {
-  body.embed {
+  :root:not([data-theme]) body.embed {
     --surface: #1d1a26; --surface-2: #221e2d; --ink: #ece9f5; --ink-2: #cfcade; --muted: #a29db3; --line: #2b2737; --line-strong: #3a354a;
     --floor: #221e2d; --floor-tile: #27233a; --corridor: #1a1723; --wall: #3d3750;
     --accent: #a99cff; --accent-2: #c3b9ff; --accent-soft: rgba(169, 156, 255, .16);
@@ -307,6 +315,11 @@ body.embed .play { background: var(--accent); color: #fff; }
 body.embed .sdot.on, body.embed .sdot.done { background: var(--accent); }
 body.embed .hbar.top .hb-fill { background: linear-gradient(90deg, var(--pos), #f7b2a6); }
 body.embed .strat.on .fill, body.embed .mini-bar { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+
+/* legend icons for the ward network */
+.lg-node { width: 12px; height: 12px; border-radius: 50%; display: inline-block; background: var(--surface); box-shadow: 0 0 0 1.5px var(--line-strong); }
+.lg-ring { width: 12px; height: 12px; border-radius: 50%; display: inline-block; border: 3px solid var(--accent); border-right-color: var(--line); }
+.lg-line { width: 18px; height: 4px; border-radius: 2px; display: inline-block; background: var(--accent); opacity: .6; }
 
 /* ===== Presentation mode ===== */
 body.present .foot, body.present .sub, body.present .progress { display: none; }
