@@ -45,7 +45,7 @@ CHAPTERS = [
 # Starting iframe height per scene (px); the scene then resizes its frame to fit its content.
 DEMO_HEIGHT = {0: 520, 1: 600, 2: 600, 3: 600, 4: 600, 5: 600}
 
-st.set_page_config(page_title="MRSA Ward Map", page_icon="🏥", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="MRSA Ward Map", page_icon="🏥", layout="wide", initial_sidebar_state="auto")  # open on desktop, a closed drawer on phones
 st.markdown(f"<style>{(Path(__file__).parent / 'streamlit_style.css').read_text(encoding='utf-8')}</style>",
             unsafe_allow_html=True)
 
@@ -117,6 +117,19 @@ with st.sidebar:
     )
 
 # ----------------------------------------------------------------- chapter --
+# On phones the sidebar is a drawer: close it on the first load and after a
+# chapter is picked, so the chapter is never hidden behind it (wide screens: no effect).
+if st.session_state.get("_shown_chapter") != idx:
+    # the chapter number makes the HTML differ per chapter, so Streamlit runs the script again
+    components.html(f'<script data-chapter="{idx}">' + """
+      const p = window.parent;
+      if (p.innerWidth < 900) {
+        const b = [...p.document.querySelectorAll("button")].find((x) => x.getAttribute("aria-label") === "Collapse sidebar");
+        if (b) b.click();
+      }
+    </script>""", height=0)
+st.session_state["_shown_chapter"] = idx
+
 title, lede, scene = CHAPTERS[idx]
 st.markdown(
     f"""<header class="ch-head"><span class="ch-num">Chapter {idx + 1:02d} / {len(CHAPTERS):02d}</span>

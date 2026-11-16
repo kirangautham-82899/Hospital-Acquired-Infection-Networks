@@ -338,6 +338,30 @@ body.embed .strat.on .fill, body.embed .mini-bar { background: linear-gradient(9
 .lg-ring { width: 12px; height: 12px; border-radius: 50%; display: inline-block; border: 3px solid var(--accent); border-right-color: var(--line); }
 .lg-line { width: 18px; height: 4px; border-radius: 2px; display: inline-block; background: var(--accent); opacity: .6; }
 
+/* ===== Phones (also inside the Streamlit app) ===== */
+.swipe-hint { display: none; }
+@media (max-width: 760px) {
+  body.embed .layout, .layout { grid-template-columns: 1fr !important; gap: 12px; }
+  .layout > *, .stage { min-width: 0; }
+  .canvas-wrap { max-width: 100%; }
+  .canvas-wrap.scrolls { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+  .canvas-wrap.scrolls + .swipe-hint { display: block; text-align: center; font-size: 11.5px; color: var(--muted); padding: 6px 0 0; }
+  .stage { padding: 10px; }
+  .stage-bar { gap: 8px; padding-top: 10px; }
+  .seq-cap { order: 5; flex-basis: 100%; min-width: 0; font-size: 13.5px; }
+  .seq-slider { flex: 1; width: auto; }
+  .week-info { min-width: 0; }
+  .chips { flex-wrap: wrap; }
+  .legend { gap: 6px 12px; font-size: 11.5px; }
+  .legend-note { flex-basis: 100%; margin-left: 0; }
+  .panel, body.embed .panel { padding: 18px 16px; }
+  .panel h2 { font-size: 21px; }
+  .flow b { font-size: 24px; }
+  .vs b { font-size: 32px; }
+  .play { width: 40px; height: 40px; }
+  .play.ghost-btn { width: 36px; height: 36px; }
+}
+
 /* ===== Presentation mode ===== */
 body.present .foot, body.present .sub, body.present .progress { display: none; }
 body.present .top { padding-top: 12px; padding-bottom: 12px; }

@@ -126,11 +126,16 @@
   // ---------- canvas ----------
   const cv = $("stage"), ctx = cv.getContext("2d");
   let scale = 1, cssW = 0;
+  // On phones the map keeps a readable minimum width and scrolls sideways
+  // (squeezed to a phone's width its labels would be about 6 px tall).
+  const MIN_MAP_W = 620;
   function resize() {
-    const wrap = $("canvasWrap"); cssW = wrap.clientWidth;
+    const wrap = $("canvasWrap"), avail = wrap.clientWidth;
+    cssW = avail < MIN_MAP_W && window.innerWidth < 760 ? MIN_MAP_W : avail;
+    wrap.classList.toggle("scrolls", cssW > avail);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     cv.width = Math.round(cssW * dpr); cv.height = Math.round(cssW * H / W * dpr);
-    cv.style.height = (cssW * H / W) + "px";
+    cv.style.width = cssW + "px"; cv.style.height = (cssW * H / W) + "px";
     scale = cv.width / W;
   }
   new ResizeObserver(resize).observe($("canvasWrap"));
@@ -1415,7 +1420,12 @@
 
   if (LOCK && window.frameElement) {
     const fit = () => {
-      try { window.frameElement.style.height = Math.ceil(document.querySelector(".layout").getBoundingClientRect().height + 6) + "px"; }
+      try {
+        const h = Math.ceil(document.querySelector(".layout").getBoundingClientRect().height + 6) + "px";
+        window.frameElement.style.height = h;
+        // Streamlit's wrapper keeps the starting height; grow it too, or the content below slides under the scene
+        const box = window.frameElement.closest('[data-testid="stElementContainer"]'); if (box) box.style.height = h;
+      }
       catch (e) { /* cross-origin host: keep the host's fixed height */ }
     };
     new ResizeObserver(fit).observe(document.body);
